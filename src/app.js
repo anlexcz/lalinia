@@ -34,32 +34,37 @@ function mapView(){const tram=[...state.states.values()].filter(s=>s.category===
  return `<div class="toolbar"><h2>Herní mapa</h2><span class="note">${tram.length} zastávek · ${data.topology.edges.length} spojnic</span></div><div class="map-wrap"><div id="strategic-map" class="strategic-map" aria-label="Interaktivní mapa Prahy"></div></div><div class="filter" style="margin-top:12px;gap:12px;">${Object.keys(state.scoring).map(t=>`<span class="teamline"><i class="dot" style="background:${teamColor(t)}"></i>${esc(t)}</span>`).join('')}</div>`;}
 function initStrategicMap(){
  const el=document.getElementById('strategic-map');if(!el)return;
- if(!window.maplibregl){el.innerHTML='<div class="empty">Mapový podklad není dostupný.</div>';return;}
+ if(typeof window.L==='undefined'){el.innerHTML='<div class="empty">Mapovou knihovnu se nepodařilo načíst.</div>';return;}
  const tram=[...state.states.values()].filter(s=>s.category==='tram'&&Number.isFinite(s.lat)&&Number.isFinite(s.lon));
- const edges={type:'FeatureCollection',features:data.topology.edges.map(e=>{
-  const coords=(e.geometry?.length?e.geometry:[[state.states.get(e.from)?.lat,state.states.get(e.from)?.lon],[state.states.get(e.to)?.lat,state.states.get(e.to)?.lon]])
-   .filter(pt=>Number.isFinite(pt?.[0])&&Number.isFinite(pt?.[1])).map(([lat,lon])=>[lon,lat]);
-  return {type:'Feature',geometry:{type:'LineString',coordinates:coords},properties:{}};
- }).filter(f=>f.geometry.coordinates.length>=2)};
- const stops={type:'FeatureCollection',features:tram.map(s=>({type:'Feature',geometry:{type:'Point',coordinates:[s.lon,s.lat]},properties:{id:s.id,name:s.name,owner:s.owner||'Neutrální',value:s.value,color:teamColor(s.owner)}}))};
- const map=new maplibregl.Map({container:el,style:'https://tiles.openfreemap.org/styles/liberty',center:mapViewState.center,zoom:mapViewState.zoom,minZoom:9,maxZoom:19,attributionControl:true});
+ const map=L.map(el,{zoomControl:false,minZoom:9,maxZoom:19,preferCanvas:true,scrollWheelZoom:true});
  strategicMap=map;
- map.addControl(new maplibregl.NavigationControl({showCompass:false}), 'top-right');
- map.on('moveend',()=>{if(strategicMap!==map)return;mapViewState={center:map.getCenter().toArray(),zoom:map.getZoom(),userMoved:true};});
- map.on('load',()=>{
-  if(strategicMap!==map)return;
-  try{applyGameMapStyle(map);}catch(err){console.warn('Úprava mapového stylu:',err);}
-  map.addSource('game-edges',{type:'geojson',data:edges});
-  map.addLayer({id:'game-edges',type:'line',source:'game-edges',paint:{'line-color':'#6f8b7a','line-width':['interpolate',['linear'],['zoom'],10,1,14,2.2,18,3],'line-opacity':.7}});
-  map.addSource('game-stops',{type:'geojson',data:stops});
-  map.addLayer({id:'game-stops-hit',type:'circle',source:'game-stops',paint:{'circle-radius':14,'circle-opacity':0,'circle-stroke-opacity':0}});
-  map.addLayer({id:'game-stops-visible',type:'circle',source:'game-stops',paint:{'circle-radius':['interpolate',['linear'],['zoom'],10,3.4,13,5.5,17,8.5], 'circle-color':['get','color'],'circle-stroke-color':'#111715','circle-stroke-width':1.5,'circle-opacity':.98}});
-  map.on('mouseenter','game-stops-hit',()=>map.getCanvas().style.cursor='pointer');
-  map.on('mouseleave','game-stops-hit',()=>map.getCanvas().style.cursor='');
-  map.on('click','game-stops-hit',ev=>{const f=ev.features?.[0];if(f){selected=Number(f.properties.id);render();}});
-  if(!mapViewState.userMoved){const bounds=new maplibregl.LngLatBounds();tram.forEach(s=>bounds.extend([s.lon,s.lat]));map.fitBounds(bounds,{padding:24,maxZoom:12.5,duration:0});}
+ map.setView([mapViewState.center[1],mapViewState.center[0]],mapViewState.zoom,{animate:false});
+ L.control.zoom({position:'topright'}).addTo(map);
+ let tilesLoaded=false,tilesFailed=0;
+ const tiles=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+   attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+   maxZoom:19, minZoom:9, className:'osm-gray',crossOrigin:false
  });
- map.on('error',ev=>{console.warn('MapLibre:',ev.error?.message||ev);});
+ tiles.on('tileload',()=>{tilesLoaded=true;const warning=el.querySelector('.map-load-warning');if(warning)warning.remove();});
+ tiles.on('tileerror',()=>{tilesFailed++;if(tilesFailed>=4&&!tilesLoaded&&!el.querySelector('.map-load-warning')){const warning=document.createElement('div');warning.className='map-load-warning';warning.textContent='Podklad nedostupný';el.appendChild(warning);}});
+ tiles.addTo(map);
+ map.on('moveend zoomend',()=>{if(strategicMap!==map)return;const center=map.getCenter();mapViewState={center:[center.lng,center.lat],zoom:map.getZoom(),userMoved:true};});
+ data.topology.edges.forEach(e=>{
+  const coords=(e.geometry?.length?e.geometry:[[state.states.get(e.from)?.lat,state.states.get(e.from)?.lon],[state.states.get(e.to)?.lat,state.states.get(e.to)?.lon]]).filter(p=>Number.isFinite(p?.[0])&&Number.isFinite(p?.[1]));
+  if(coords.length>=2)L.polyline(coords,{color:'#7b9384',weight:2,opacity:.78,interactive:false}).addTo(map);
+ });
+ tram.forEach(s=>{
+  const marker=L.circleMarker([s.lat,s.lon],{radius:7,fillColor:teamColor(s.owner),fillOpacity:.97,color:'#121715',weight:1.5});
+  marker.bindTooltip(esc(s.name)+' · '+esc(s.owner||'Neutrální')+' · '+s.value,{direction:'top'});
+  marker.on('click',()=>{selected=s.id;render();});
+  marker.addTo(map);
+ });
+ if(!mapViewState.userMoved){
+  const bounds=L.latLngBounds(tram.map(s=>[s.lat,s.lon]));
+  map.fitBounds(bounds.pad(.06),{animate:false});
+  const center=map.getCenter();mapViewState={center:[center.lng,center.lat],zoom:map.getZoom(),userMoved:false};
+ }
+ setTimeout(()=>{if(strategicMap===map)map.invalidateSize();},40);
 }
 function stationDetail(id){
  const s=state.states.get(id);if(!s)return '';
