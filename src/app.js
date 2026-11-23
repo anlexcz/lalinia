@@ -1,7 +1,9 @@
 import {MY_TEAM,fmtTime,fmtShort,reconstruct,impactOf,lossOf,opportunityFor,requiredPlayers,stationHistory,findOperations,recentCaptures} from './engine.js';
 const paths=['topology.json','rules.json','checkpoint.json','captures.json'];
 const app=document.querySelector('#app');
-let data={},state,view='overview',players=4,selected=null,search='',sortBy='value',now=Date.now(),mapFocus=false,operationsCache=[];
+let data={},state,view='overview',players=4,selected=null,search='',sortBy='value',now=Date.now(),operationsCache=[];
+let leafletMap=null,leafletMarkers=null,leafletLines=null;
+let mapViewState={center:[50.087,14.42],zoom:12};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const teamColor=owner=>({'Cosa Nostra':'#32b968','Spiriti':'#5797db','Zemunski klan':'#a475d8','Yakuza':'#e56a67','Los Bandidos':'#dcb467'})[owner]||'#64746b';
 const cap=n=>Number(n||0).toLocaleString('cs-CZ');
@@ -10,7 +12,7 @@ function refresh(){now=Date.now();state=reconstruct(data.topology,data.rules,dat
 function nav(){return `<nav class="nav">${[['overview','Přehled'],['map','Mapa'],['targets','Útok'],['operations','Operace'],['opportunities','Decay'],['defense','Obrana']].map(([id,name])=>`<button data-view="${id}" class="${view===id?'active':''}">${name}</button>`).join('')}</nav>`;}
 function top(){let issue=state.errors.length?`<div class="warning"><b>${state.errors.length} chyb ve vstupních událostech</b><p>${state.errors.slice(0,4).map(esc).join('<br>')}</p></div>`:'';
  const freshness=state.latestEvent?fmtTime(state.latestEvent):'bez událostí';
- return `<header class="top"><div><div class="eyebrow">LA LINIA / COSA NOSTRA</div><h1>Strategický přehled</h1></div><div class="stamp">Poslední událost<br><b>${freshness}</b><br>${state.added} nových od checkpointu</div></header>${issue}${state.warnings.length?`<div class="warning">${state.warnings.length} upozornění při rekonstrukci. ${esc(state.warnings[0])}</div>`:''}`;}
+ return `<header class="top"><div><div class="eyebrow">LA LINIA</div><h1>Cosa Nostra</h1></div><div class="stamp">Data <b>${freshness}</b></div></header>${issue}${state.warnings.length?`<div class="warning">${state.warnings.length} upozornění při rekonstrukci. ${esc(state.warnings[0])}</div>`:''}`;}
 function card(name,num){return `<div class="card"><span class="sub">${name}</span><strong>${num}</strong></div>`;}
 function personFilter(){return `<div class="filter"><label for="players">Dostupní hráči</label><select id="players">${[3,4,5,6,7,8,9,10,12].map(n=>`<option value="${n}" ${players===n?'selected':''}>${n} hráčů</option>`).join('')}</select></div>`;}
 function targets(){return [...state.states.values()].filter(s=>s.category==='tram'&&s.owner!==MY_TEAM).map(s=>impactOf(state,s.id,data.rules)).filter(Boolean).sort((a,b)=>b.score-a.score);}
@@ -20,19 +22,53 @@ function overview(){const own=state.scoring[MY_TEAM];const ranking=Object.entrie
 function targetRowSimple(x){return `<div class="row"><button data-station="${x.station.id}"><b>${esc(x.station.name)}</b><br><span class="muted">${esc(x.owner||'Neutrální')} · ${x.cost} jízdenek · území ${x.areaGain>=0?'+':''}${x.areaGain}</span></button><span><strong class="good">+${cap(x.gain)}</strong>${x.owner?`<br><span class="bad note">−${cap(x.enemyLoss)} soupeř</span>`:''}</span></div>`;}
 function defenses(){return [...state.states.values()].filter(s=>s.owner===MY_TEAM&&s.category==='tram').map(s=>lossOf(state,s.id,data.rules)).filter(Boolean).sort((a,b)=>b.loss-a.loss);}
 function opportunities(){return [...state.states.values()].filter(s=>s.category==='tram'&&s.owner!==MY_TEAM).map(s=>{const op=opportunityFor(s,data.rules,players,now);return op?{station:s,...op,impact:impactOf(state,s.id,data.rules)}:null;}).filter(Boolean).sort((a,b)=>a.now!==b.now?(a.now?-1:1):a.now?b.impact.score-a.impact.score:a.at-b.at);}
-function attackView(){const items=targets().filter(x=>x.cost<=players&&x.station.name.toLocaleLowerCase('cs').includes(search.toLocaleLowerCase('cs')));items.sort((a,b)=>sortBy==='value'?b.score-a.score:sortBy==='cost'?a.cost-b.cost:b.gain-a.gain);return `<div class="toolbar"><h2>Výhodné útoky</h2>${personFilter()}<div class="filter"><input id="search" placeholder="Hledat zastávku…" value="${esc(search)}"/><select id="sort"><option value="value" ${sortBy==='value'?'selected':''}>Celkový dopad</option><option value="gain" ${sortBy==='gain'?'selected':''}>Náš zisk</option><option value="cost" ${sortBy==='cost'?'selected':''}>Cena</option></select></div></div><div class="panel"><div class="note">Přínosy jsou pro jednotlivá převzetí zvlášť. Nelze je sčítat do jedné operace. Uvedené skóre je změna proti aktuálně zrekonstruovanému stavu.</div><div class="list-head"><span>Zastávka</span><span>Hráčů</span><span>Náš zisk</span><span>Soupeř</span></div>${items.map(x=>`<div class="target-row"><button data-station="${x.station.id}">${esc(x.station.name)}<br><span class="note">${esc(x.owner||'Neutrální')}${x.station.is_terminus?' · konečná':''}</span></button><span>${x.cost}</span><span class="score good">+${cap(x.gain)}</span><span class="score bad">${x.owner?'−'+cap(x.enemyLoss):'—'}</span></div>`).join('')||'<div class="empty">Žádné cíle při zvoleném počtu hráčů.</div>'}</div>`;}
-function opportunitiesView(){const o=opportunities();return `<div class="toolbar"><h2>Časová okna decay</h2>${personFilter()}</div><div class="panel"><p class="note">Předpovědi jsou podmíněné: každé nové obsazení nebo posílení může časovou osu změnit. Časy v Europe/Prague. U aktuálně chráněných zastávek je nutné vyčkat také konce 15minutové ochrany.</p><h3>Dostupné nyní</h3>${o.filter(x=>x.now).slice(0,30).map(x=>`<div class="row"><button data-station="${x.station.id}">${esc(x.station.name)} <span class="note">${esc(x.station.owner||'Neutrální')}</span></button><b>${x.needed} hráči</b></div>`).join('')||'<div class="empty">Žádné dostupné zastávky.</div>'}<h3 style="margin-top:25px">Budoucí dostupnost</h3>${o.filter(x=>!x.now).map(x=>`<div class="row"><button data-station="${x.station.id}"><b>${esc(x.station.name)}</b><br><span class="note">${esc(x.station.owner)} · hodnota ${x.station.value} → při poklesu bude stačit ${x.needed}</span></button><b>${fmtShort(x.at)}</b></div>`).join('')||'<div class="empty">Žádná nová příležitost.</div>'}</div>`;}
-function defenseView(){return `<div class="toolbar"><h2>Obrana našich území</h2></div><div class="panel"><p class="note">Předpokládaná ztráta skóre při převzetí jedné naší zastávky. Započítává se změna územního bonusu.</p>${defenses().map(x=>`<div class="row"><button data-station="${x.station.id}"><b>${esc(x.station.name)}</b><br><span class="note">Hodnota ${x.station.value} · soupeř potřebuje ${x.needed} hráčů${x.station.pending.length?' · další pokles '+fmtShort(x.station.pending[0].at):''}</span></button><b class="bad">−${cap(x.loss)}</b></div>`).join('')}</div>`;}
+function attackView(){const items=targets().filter(x=>x.cost<=players&&x.station.name.toLocaleLowerCase('cs').includes(search.toLocaleLowerCase('cs')));items.sort((a,b)=>sortBy==='value'?b.score-a.score:sortBy==='cost'?a.cost-b.cost:b.gain-a.gain);return `<div class="toolbar"><h2>Výhodné útoky</h2>${personFilter()}<div class="filter"><input id="search" placeholder="Hledat zastávku…" value="${esc(search)}"/><select id="sort"><option value="value" ${sortBy==='value'?'selected':''}>Celkový dopad</option><option value="gain" ${sortBy==='gain'?'selected':''}>Náš zisk</option><option value="cost" ${sortBy==='cost'?'selected':''}>Cena</option></select></div></div><div class="panel"><div class="list-head"><span>Zastávka</span><span>Hráčů</span><span>Náš zisk</span><span>Soupeř</span></div>${items.map(x=>`<div class="target-row"><button data-station="${x.station.id}">${esc(x.station.name)}<br><span class="note">${esc(x.owner||'Neutrální')}${x.station.is_terminus?' · konečná':''}</span></button><span>${x.cost}</span><span class="score good">+${cap(x.gain)}</span><span class="score bad">${x.owner?'−'+cap(x.enemyLoss):'—'}</span></div>`).join('')||'<div class="empty">Žádné cíle při zvoleném počtu hráčů.</div>'}</div>`;}
+function opportunitiesView(){const o=opportunities();return `<div class="toolbar"><h2>Časová okna decay</h2>${personFilter()}</div><div class="panel"><h3>Dostupné nyní</h3>${o.filter(x=>x.now).slice(0,30).map(x=>`<div class="row"><button data-station="${x.station.id}">${esc(x.station.name)} <span class="note">${esc(x.station.owner||'Neutrální')}</span></button><b>${x.needed} hráči</b></div>`).join('')||'<div class="empty">Žádné dostupné zastávky.</div>'}<h3 style="margin-top:25px">Budoucí dostupnost</h3>${o.filter(x=>!x.now).map(x=>`<div class="row"><button data-station="${x.station.id}"><b>${esc(x.station.name)}</b><br><span class="note">${esc(x.station.owner)} · hodnota ${x.station.value} → při poklesu bude stačit ${x.needed}</span></button><b>${fmtShort(x.at)}</b></div>`).join('')||'<div class="empty">Žádná nová příležitost.</div>'}</div>`;}
+function defenseView(){return `<div class="toolbar"><h2>Obrana našich území</h2></div><div class="panel">${defenses().map(x=>`<div class="row"><button data-station="${x.station.id}"><b>${esc(x.station.name)}</b><br><span class="note">Hodnota ${x.station.value} · soupeř potřebuje ${x.needed} hráčů${x.station.pending.length?' · další pokles '+fmtShort(x.station.pending[0].at):''}</span></button><b class="bad">−${cap(x.loss)}</b></div>`).join('')}</div>`;}
 function operationsView(){
  if(!operationsCache.length||operationsCache.players!==players){operationsCache=findOperations(state,data.rules,players,36);operationsCache.players=players;}
  const best=operationsCache.filter(o=>o.cost<=36).slice(0,24);
- return `<div class="toolbar"><h2>Společné operace</h2>${personFilter()}</div><section class="panel"><p class="note">Automatické hledání místních dvojic a trojic. Každá kombinace se přepočítává v celém herním grafu. Není zaručeno globální optimum; odhad nezahrnuje cestovní čas a obranu soupeře. Náklady představují minimální počet jízdenek při jednotlivých obsazeních.</p>${best.map((o,i)=>`<div class="operation"><div class="operation-heading"><b>${i+1}. ${o.ids.map(id=>esc(state.states.get(id).name)).join(' + ')}</b><strong class="good">+${cap(o.ourGain)} nám</strong></div><div class="op-details"><span>${o.maxPlayers} hráčů max.</span><span>${o.cost} jízdenek</span><span class="bad">−${cap(o.opponentLoss)} soupeřům</span><span>Proti lídrovi +${cap(o.leaderGapChange)}</span></div><div class="operation-links">${o.ids.map(id=>`<button class="pill" data-station="${id}">${esc(state.states.get(id).name)} ↗</button>`).join('')}</div></div>`).join('')||'<div class="empty">Pro tuto skupinu zatím žádné dostupné kombinace.</div>'}</section>`;
+ return `<div class="toolbar"><h2>Společné operace</h2>${personFilter()}</div><section class="panel">${best.map((o,i)=>`<div class="operation"><div class="operation-heading"><b>${i+1}. ${o.ids.map(id=>esc(state.states.get(id).name)).join(' + ')}</b><strong class="good">+${cap(o.ourGain)} nám</strong></div><div class="op-details"><span>${o.maxPlayers} hráčů max.</span><span>${o.cost} jízdenek</span><span class="bad">−${cap(o.opponentLoss)} soupeřům</span><span>Proti lídrovi +${cap(o.leaderGapChange)}</span></div><div class="operation-links">${o.ids.map(id=>`<button class="pill" data-station="${id}">${esc(state.states.get(id).name)} ↗</button>`).join('')}</div></div>`).join('')||'<div class="empty">Pro tuto skupinu zatím žádné dostupné kombinace.</div>'}</section>`;
 }
-function project(lat,lon,b){const x=30+(lon-b.minLon)/(b.maxLon-b.minLon)*940,y=28+(b.maxLat-lat)/(b.maxLat-b.minLat)*510;return [x,y];}
-function mapView(){const tram=[...state.states.values()].filter(s=>s.category==='tram');const lats=tram.map(s=>s.lat),lons=tram.map(s=>s.lon),b={minLat:Math.min(...lats)-.003,maxLat:Math.max(...lats)+.003,minLon:Math.min(...lons)-.006,maxLon:Math.max(...lons)+.006};
- const lines=data.topology.edges.map(e=>{const coords=e.geometry?.length?e.geometry:[[state.states.get(e.from)?.lat,state.states.get(e.from)?.lon],[state.states.get(e.to)?.lat,state.states.get(e.to)?.lon]];if(coords.some(p=>!Number.isFinite(p[0])||!Number.isFinite(p[1])))return '';return `<polyline points="${coords.map(([lat,lon])=>project(lat,lon,b).join(',')).join(' ')}" fill="none" stroke="#3c5147" stroke-width="1.45"/>`;}).join('');
- const circles=tram.map(s=>{const [x,y]=project(s.lat,s.lon,b);return `<circle data-station="${s.id}" cx="${x}" cy="${y}" r="3.6" fill="${teamColor(s.owner)}"><title>${esc(s.name)} · ${esc(s.owner||'Neutrální')} · ${s.value}</title></circle>`;}).join('');
- return `<div class="toolbar"><h2>Herní mapa</h2><span class="note">${tram.length} tramvajových zastávek · ${data.topology.edges.length} spojnic</span></div><div class="map-wrap"><svg viewBox="0 0 1000 570" aria-label="Schematická geografická mapa zastávek">${lines}${circles}</svg><div class="map-note">Schéma podle souřadnic, nikoli podkladová mapa. Klikni na zastávku pro detail.</div></div><div class="filter" style="margin-top:12px;gap:12px;">${Object.keys(state.scoring).map(t=>`<span class="teamline"><i class="dot" style="background:${teamColor(t)}"></i>${esc(t)}</span>`).join('')}</div>`;}
+function mapView(){const tram=[...state.states.values()].filter(s=>s.category==='tram');
+ return `<div class="toolbar"><h2>Herní mapa</h2><span class="note">${tram.length} tramvajových zastávek · ${data.topology.edges.length} spojnic</span></div><div class="map-wrap leaflet-wrap"><div id="leaflet-map" class="leaflet-map" aria-label="Interaktivní mapa Prahy se zastávkami"></div></div><div class="filter" style="margin-top:12px;gap:12px;">${Object.keys(state.scoring).map(t=>`<span class="teamline"><i class="dot" style="background:${teamColor(t)}"></i>${esc(t)}</span>`).join('')}</div>`;}
+function initLeafletMap(){
+ const el=document.getElementById('leaflet-map');
+ if(!el) return; if(typeof window.L==='undefined'){el.innerHTML='<div class="empty">Mapový podklad se nepodařilo načíst.</div>';return;}
+ const tram=[...state.states.values()].filter(s=>s.category==='tram'&&Number.isFinite(s.lat)&&Number.isFinite(s.lon));
+ if(!leafletMap){
+   leafletMap=L.map(el,{zoomControl:false,minZoom:10,maxZoom:18});
+   L.control.zoom({position:'topright'}).addTo(leafletMap);
+   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(leafletMap);
+   leafletMap.on('moveend zoomend',()=>{const c=leafletMap.getCenter();mapViewState={center:[c.lat,c.lng],zoom:leafletMap.getZoom(),userMoved:true};});
+ }
+ if(!leafletMap._llHasInitialFit && !mapViewState.userMoved){
+   const bounds=L.latLngBounds(tram.map(s=>[s.lat,s.lon]));
+   leafletMap.fitBounds(bounds.pad(0.08),{animate:false});
+   const c=leafletMap.getCenter();mapViewState={center:[c.lat,c.lng],zoom:leafletMap.getZoom(),userMoved:true};
+   leafletMap._llHasInitialFit=true;
+ } else {
+   leafletMap.setView(mapViewState.center,mapViewState.zoom,{animate:false});
+ }
+ if(leafletLines) leafletLines.remove();
+ if(leafletMarkers) leafletMarkers.remove();
+ leafletLines=L.layerGroup();
+ data.topology.edges.forEach(e=>{
+   const coords=(e.geometry&&e.geometry.length?e.geometry:[[state.states.get(e.from)?.lat,state.states.get(e.from)?.lon],[state.states.get(e.to)?.lat,state.states.get(e.to)?.lon]])
+      .filter(p=>Number.isFinite(p?.[0])&&Number.isFinite(p?.[1]));
+   if(coords.length>=2) L.polyline(coords,{color:'#587066',weight:2,opacity:.68,interactive:false}).addTo(leafletLines);
+ });
+ leafletLines.addTo(leafletMap);
+ leafletMarkers=L.layerGroup();
+ tram.forEach(s=>{
+   const marker=L.circleMarker([s.lat,s.lon],{radius:selected===s.id?8:6,fillColor:teamColor(s.owner),fillOpacity:.96,color:selected===s.id?'#ffffff':'#0b1110',weight:selected===s.id?3:1.5});
+   marker.bindTooltip(`${s.name} · ${s.owner||'Neutrální'} · ${s.value}`,{direction:'top',offset:[0,-8]});
+   marker.on('click',()=>{selected=s.id;render();});
+   marker.addTo(leafletMarkers);
+ });
+ leafletMarkers.addTo(leafletMap);
+ setTimeout(()=>leafletMap.invalidateSize(),0);
+}
 function stationDetail(id){
  const s=state.states.get(id);if(!s)return '';
  const impact=impactOf(state,id,data.rules),risk=lossOf(state,id,data.rules);
@@ -44,12 +80,12 @@ function stationDetail(id){
  <div class="cards" style="grid-template-columns:repeat(2,1fr);margin-top:20px">${card('Aktuální hodnota',s.value)}${card('Potřeba hráčů na převzetí',s.needed)}</div>
  ${s.capture?`<div class="metric"><span>Poslední obsazení</span><b>${fmtTime(s.capture.ms)}</b></div><div class="metric"><span>Poslední skupina</span><b>${s.capture.value} hráčů</b></div><div class="metric"><span>Ochrana</span><b class="${currentProtection?'bad':''}">${currentProtection?'Do '+fmtTime(s.protectedUntil):'Ukončena'}</b></div>`:'<p class="note">V historii není obsazení této zastávky.</p>'}
  ${impact?`<div class="metric"><span>Samostatný útok</span><b class="good">+${cap(impact.gain)} nám · ${impact.owner?'−'+cap(impact.enemyLoss)+' soupeři':'neutrální'}</b></div>`:''}${risk?`<div class="metric"><span>Ztráta při převzetí</span><b class="bad">−${cap(risk.loss)} bodů</b></div>`:''}
- <h3 style="margin-top:25px">Časová osa hodnoty</h3>${decay}<p class="note">Časy jsou podmíněné tím, že nepřibude nové obsazení. Předpovězený decay není skutečná událost.</p>
+ <h3 style="margin-top:25px">Časová osa hodnoty</h3>${decay}
  <h3 style="margin-top:25px">Historie obsazení (${history.length})</h3><div class="history-list">${historyHtml}</div>
  <div class="metric"><span>Herní sousedé</span><span class="neighbors">${(s.neighbors||[]).map(n=>`<button class="pill" data-station="${n}">${esc(state.states.get(n)?.name||n)}</button>`).join('')||'Žádní'}</span></div></section>`;
 }
 
-function render(){const body=view==='overview'?overview():view==='map'?mapView():view==='targets'?attackView():view==='operations'?operationsView():view==='opportunities'?opportunitiesView():defenseView();app.innerHTML=`<div class="app">${top()}${nav()}${selected!==null?stationDetail(selected):body}<div class="foot">Výpočty vycházejí z pevné topologie, pravidel a ručně vedených událostí. Původní skóre je ukotveno v checkpoint.json. Data nejsou automaticky synchronizována s oficiální hrou.</div></div>`;}
+function render(){if(leafletMap){leafletMap.remove();leafletMap=null;leafletMarkers=null;leafletLines=null;}const body=view==='overview'?overview():view==='map'?mapView():view==='targets'?attackView():view==='operations'?operationsView():view==='opportunities'?opportunitiesView():defenseView();app.innerHTML=`<div class="app">${top()}${nav()}${selected!==null?stationDetail(selected):body}</div>`; if(view==='map'&&selected===null) initLeafletMap();}
 app.addEventListener('click',e=>{const st=e.target.closest('[data-station]');if(st){selected=Number(st.dataset.station);render();return;}const v=e.target.closest('[data-view]');if(v){selected=null;view=v.dataset.view;render();return;}if(e.target.closest('#close-detail')){selected=null;render();}});
 app.addEventListener('change',e=>{if(e.target.id==='players'){players=Number(e.target.value);operationsCache=[];render();}if(e.target.id==='sort'){sortBy=e.target.value;render();}});
 app.addEventListener('input',e=>{if(e.target.id==='search'){search=e.target.value; const pos=e.target.selectionStart;render();const el=document.getElementById('search');el?.focus();el?.setSelectionRange(pos,pos);}});
