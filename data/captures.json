@@ -2950,5 +2950,192 @@
     "team": "Yakuza",
     "value": 3,
     "author": "Véčko"
+  },
+  {
+    "id": 332,
+    "datetime": "23. 11. 2026, 15:05:00",
+    "station": "Nádraží Holešovice",
+    "category": "tram",
+    "team": "Zemunski klan",
+    "value": 5,
+    "source": "Discord – Zabírací reportér, screenshot 23. 11. 2026",
+    "time_precision": "minute",
+    "time_note": "Čas je čas zprávy Discordu; sekundy ani přesný okamžik zabrání nejsou doloženy."
+  },
+  {
+    "id": 333,
+    "datetime": "23. 11. 2026, 15:14:00",
+    "station": "Kobylisy",
+    "category": "tram",
+    "team": "Zemunski klan",
+    "value": 5,
+    "source": "Discord – Zabírací reportér, screenshot 23. 11. 2026",
+    "time_precision": "minute",
+    "time_note": "Čas je čas zprávy Discordu; sekundy ani přesný okamžik zabrání nejsou doloženy."
+  },
+  {
+    "id": 334,
+    "datetime": "23. 11. 2026, 15:22:00",
+    "station": "Březiněveská",
+    "category": "tram",
+    "team": "Zemunski klan",
+    "value": 5,
+    "source": "Discord – Zabírací reportér, screenshot 23. 11. 2026",
+    "time_precision": "minute",
+    "time_note": "Čas je čas zprávy Discordu; sekundy ani přesný okamžik zabrání nejsou doloženy."
+  },
+  {
+    "id": 335,
+    "datetime": "23. 11. 2026, 15:22:00",
+    "station": "Líbeznická",
+    "category": "tram",
+    "team": "Zemunski klan",
+    "value": 5,
+    "source": "Discord – Zabírací reportér, screenshot 23. 11. 2026",
+    "time_precision": "minute",
+    "time_note": "Čas je čas zprávy Discordu; sekundy ani přesný okamžik zabrání nejsou doloženy."
+  },
+  {
+    "id": 336,
+    "datetime": "23. 11. 2026, 15:22:00",
+    "station": "Vozovna Kobylisy",
+    "category": "tram",
+    "team": "Zemunski klan",
+    "value": 5,
+    "source": "Discord – Zabírací reportér, screenshot 23. 11. 2026",
+    "time_precision": "minute",
+    "time_note": "Čas je čas zprávy Discordu; sekundy ani přesný okamžik zabrání nejsou doloženy."
+  },
+  {
+    "id": 337,
+    "datetime": "23. 11. 2026, 15:33:00",
+    "station": "Střelničná",
+    "category": "tram",
+    "team": "Zemunski klan",
+    "value": 5,
+    "source": "Discord – Zabírací reportér, screenshot 23. 11. 2026",
+    "time_precision": "minute",
+    "time_note": "Čas je čas zprávy Discordu; sekundy ani přesný okamžik zabrání nejsou doloženy."
+  },
+  {
+    "id": 338,
+    "datetime": "23. 11. 2026, 15:33:00",
+    "station": "Nádraží Holešovice",
+    "category": "tram",
+    "team": "Yakuza",
+    "value": 7,
+    "source": "Discord – Zabírací reportér, screenshot 23. 11. 2026",
+    "time_precision": "minute",
+    "time_note": "Čas je čas zprávy Discordu; sekundy ani přesný okamžik zabrání nejsou doloženy."
+  },
+  {
+    "id": 339,
+    "datetime": "23. 11. 2026, 15:41:00",
+    "station": "Kyselova",
+    "category": "tram",
+    "team": "Zemunski klan",
+    "value": 5,
+    "source": "Discord – Zabírací reportér, screenshot 23. 11. 2026",
+    "time_precision": "minute",
+    "time_note": "Čas je čas zprávy Discordu; sekundy ani přesný okamžik zabrání nejsou doloženy."
+  },
+  {
+    "id": 340,
+    "datetime": "23. 11. 2026, 15:41:00",
+    "station": "Výstaviště",
+    "category": "tram",
+    "team": "Yakuza",
+    "value": 7,
+    "source": "Discord – Zabírací reportér, screenshot 23. 11. 2026",
+    "time_precision": "minute",
+    "time_note": "Čas je čas zprávy Discordu; sekundy ani přesný okamžik zabrání nejsou doloženy."
+  },
+  {
+    "id": 341,
+    "datetime": "23. 11. 2026, 15:48:00",
+    "station": "Planetárium Praha",
+    "category": "tram",
+    "team": "Yakuza",
+    "value": 7,
+    "source": "Discord – Zabírací reportér, screenshot 23. 11. 2026",
+    "time_precision": "minute",
+    "time_note": "Čas je čas zprávy Discordu; sekundy ani přesný okamžik zabrání nejsou doloženy."
+  },
+  {
+    "id": 342,
+    "datetime": "23. 11. 2026, 15:48:00",
+    "station": "Ládví",
+    "category": "tram",
+    "team": "Zemunski klan",
+    "value": 5,
+    "source": "Discord – Zabírací reportér, screenshot 23. 11. 2026",
+    "time_precision": "minute",
+    "time_note": "Čas je čas zprávy Discordu; sekundy ani přesný okamžik zabrání nejsou doloženy."
+  },
+  {
+    "id": 343,
+    "datetime": "23. 11. 2026, 15:48:00",
+    "station": "Veletržní palác",
+    "category": "tram",
+    "team": "Yakuza",
+    "value": 7,
+    "source": "Discord – Zabírací reportér, screenshot 23. 11. 2026",
+    "time_precision": "minute",
+    "time_note": "Čas je čas zprávy Discordu; sekundy ani přesný okamžik zabrání nejsou doloženy."
+  },
+  {
+    "id": 344,
+    "datetime": "23. 11. 2026, 15:58:00",
+    "station": "Strossmayerovo náměstí",
+    "category": "tram",
+    "team": "Yakuza",
+    "value": 7,
+    "source": "Discord – Zabírací reportér, screenshot 23. 11. 2026",
+    "time_precision": "minute",
+    "time_note": "Čas je čas zprávy Discordu; sekundy ani přesný okamžik zabrání nejsou doloženy."
+  },
+  {
+    "id": 345,
+    "datetime": "23. 11. 2026, 15:58:00",
+    "station": "Sídliště Ďáblice",
+    "category": "tram",
+    "team": "Zemunski klan",
+    "value": 5,
+    "source": "Discord – Zabírací reportér, screenshot 23. 11. 2026",
+    "time_precision": "minute",
+    "time_note": "Čas je čas zprávy Discordu; sekundy ani přesný okamžik zabrání nejsou doloženy."
+  },
+  {
+    "id": 346,
+    "datetime": "23. 11. 2026, 15:58:00",
+    "station": "Vltavská",
+    "category": "tram",
+    "team": "Yakuza",
+    "value": 7,
+    "source": "Discord – Zabírací reportér, screenshot 23. 11. 2026",
+    "time_precision": "minute",
+    "time_note": "Čas je čas zprávy Discordu; sekundy ani přesný okamžik zabrání nejsou doloženy."
+  },
+  {
+    "id": 347,
+    "datetime": "23. 11. 2026, 16:07:00",
+    "station": "Třebenická",
+    "category": "tram",
+    "team": "Zemunski klan",
+    "value": 5,
+    "source": "Discord – Zabírací reportér, screenshot 23. 11. 2026",
+    "time_precision": "minute",
+    "time_note": "Čas je čas zprávy Discordu; sekundy ani přesný okamžik zabrání nejsou doloženy."
+  },
+  {
+    "id": 348,
+    "datetime": "23. 11. 2026, 16:07:00",
+    "station": "Štěpničná",
+    "category": "tram",
+    "team": "Zemunski klan",
+    "value": 4,
+    "source": "Discord – Zabírací reportér, screenshot 23. 11. 2026",
+    "time_precision": "minute",
+    "time_note": "Čas je čas zprávy Discordu; sekundy ani přesný okamžik zabrání nejsou doloženy."
   }
 ]
