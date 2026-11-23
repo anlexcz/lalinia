@@ -1,13 +1,13 @@
 # La Linia – strategický přehled Cosa Nostra
 
-Statická mobilní webová aplikace pro GitHub Pages. Obsahuje herní síť, přesné tabulky územních bonusů, rekonstrukci obsazení, decay, jednotlivé strategické útoky, automaticky nalezené dvojice a trojice, obranu, historii zastávek, poslední události a časová okna decay.
+Statická mobilní webová aplikace pro GitHub Pages. Obsahuje herní síť, přesné tabulky územních bonusů, rekonstrukci obsazení, decay, útoky, kombinované operace, obranu, historii zastávek a stránku Události s filtry. Územní body v přehledu lze zapnout nebo vypnout pouze pro zobrazení.
 
 ## Data
 
 - `data/topology.json`: 398 stanovišť (z toho 292 tramvajových), 328 herních spojnic. **Neměnit při aktualizaci obsazení.**
 - `data/rules.json`: tabulky územních bonusů a decay, minimum hráčů, konečné.
 - `data/checkpoint.json`: výchozí snapshot vlastníků a skóre, navázaný na historii do události ID 331. Není potřeba jej aktualizovat při nových obsazeních.
-- **`data/captures.json`: jediný soubor pro běžnou ruční aktualizaci.** Přidávejte nové záznamy z oficiální galerie. Staré záznamy nemažte.
+- **`data/captures.json`: jediný soubor pro běžnou ruční aktualizaci.** Aktuálně 404 ověřených záznamů z oficiálního exportu (ID 2–409, 21.–23. 11. 2026 do 20:37:37). Při novém úplném exportu lze celý soubor bezpečně nahradit; u průběžných ručních dodatků přidávejte události podle originálního ID.
 
 ### Jak ručně přidat obsazení
 
@@ -15,7 +15,7 @@ Na konec pole v `data/captures.json` vložte nový objekt s novým jednoznačný
 
 ```json
 {
-  "id": 332,
+  "id": 410,
   "datetime": "23. 11. 2026, 18:42:00",
   "station": "Prašný most",
   "category": "tram",
@@ -25,9 +25,15 @@ Na konec pole v `data/captures.json` vložte nový objekt s novým jednoznačný
 }
 ```
 
-Uvedený objekt je **jen ukázka formátu, ne skutečné obsazení**. Dodržte český čas `Europe/Prague`, jména týmů a názvy zastávek přesně podle vstupních souborů. Přidávat lze více záznamů najednou; web je chronologicky seřadí. Nová událost musí mít `id > 331`. Neprovádějte dodatečné změny výchozích událostí bez úpravy checkpointu. Při chybné události ji opravte nebo smažte před publikací.
+Uvedený objekt je **jen ukázka formátu, ne skutečné obsazení**. Dodržte český čas `Europe/Prague`, jména týmů a názvy zastávek přesně podle vstupních souborů. Přidávat lze více záznamů najednou; web je chronologicky seřadí. Nová událost musí mít unikátní originální ID (po tomto exportu zpravidla `> 409`). Záznamy do ID 331 ukotvuje výchozí checkpoint. Novější události z něj aplikace přehrává. Při chybné události ji opravte nebo smažte před publikací.
 
 Úložiště GitHub Pages se po commitu automaticky aktualizuje, pokud je v nastavení repozitáře povolen deploy z větve `main` (kořen `/`). Web načítá data bez cache při otevření a každou minutu přepočítává decay. **Přidání události vyžaduje obnovení stránky.**
+
+## Události a skóre
+
+- **Události**: filtry podle týmu, vlastních zisků, vlastních ztrát, vlastních posílení a všech převzetí. Historie se počítá chronologicky z `captures.json` podle stabilní zastávky, ne z Discord časů.
+- **Území**: přepínač u vlastního skóre přičítá/odečítá územní bonus jen ve zobrazeném součtu; oficiální pořadí ani výpočetní engine nemění.
+- Záznamy exportu mají přesnost na sekundy; v číselné řadě ID 2–409 scházejí ID 248, 292, 375, 389. Aplikace chybějící ID nedoplňuje.
 
 ## Výpočty a omezení
 
