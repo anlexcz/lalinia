@@ -1,10 +1,11 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-import {reconstruct,impactOf,lossOf,opportunityFor,parseCaptureTime,stationHistory,findOperations,evaluateOperation} from '../src/engine.js';
+import {reconstruct,impactOf,lossOf,opportunityFor,parseCaptureTime,stationHistory,findOperations,evaluateOperation,eventFeed} from '../src/engine.js';
 const read=name=>JSON.parse(fs.readFileSync(new URL('../data/'+name+'.json',import.meta.url)));
 const topology=read('topology'),rules=read('rules'),checkpoint=read('checkpoint'),events=read('captures');
 const at=parseCaptureTime('23. 11. 2026, 05:00:00');
-const state=reconstruct(topology,rules,checkpoint,events,at);
+const baseline=events.filter(e=>e.id<=checkpoint.checkpoint_event_id);
+const state=reconstruct(topology,rules,checkpoint,baseline,at);
 assert.equal(state.errors.length,0);assert.equal(state.warnings.length,0);assert.equal(state.scoring['Cosa Nostra'].total,798);
 assert.equal(state.graph.stations.size,398);assert.equal(topology.edges.length,328);
 assert.equal(state.eventsCount,328);
@@ -15,7 +16,7 @@ const mal=[...state.states.values()].find(s=>s.category==='tram'&&s.name==='Malo
 assert.equal(lossOf(state,mal.id,rules).loss,80);
 const added={id:332,datetime:'23. 11. 2026, 18:42:00',station:'Prašný most',category:'tram',team:'Cosa Nostra',value:4,author:'TEST'};
 const at2=parseCaptureTime('23. 11. 2026, 18:43:00');
-const changed=reconstruct(topology,rules,checkpoint,[...events,added],at2);
+const changed=reconstruct(topology,rules,checkpoint,[...baseline,added],at2);
 assert.equal(changed.errors.length,0);assert.equal(changed.states.get(pm.id).owner,'Cosa Nostra');
 assert.equal(changed.scoring['Cosa Nostra'].total,813);assert.equal(changed.added,1);
 console.log('OK: initial data, score, graph, attack, defense, one manually appended capture');
@@ -30,3 +31,21 @@ assert.ok(combinations.every(op=>op.ids.length>=2 && op.ids.length<=3 && op.maxP
 const pair=evaluateOperation(state,combinations[0].ids,rules);
 assert.deepEqual(pair.deltas,combinations[0].deltas);
 console.log('OK: capture history, takeover classification, local combinations and full graph score deltas');
+
+const recent=parseCaptureTime('23. 11. 2026, 20:38:00');
+const full=reconstruct(topology,rules,checkpoint,events,recent);
+assert.equal(events.length,404);
+assert.equal(full.eventsCount,404);
+assert.equal(full.errors.length,0,full.errors.join(' | '));
+assert.equal(full.latestEvent,parseCaptureTime('23. 11. 2026, 20:37:37'));
+const all=eventFeed(full);
+assert.equal(all.length,404);
+assert.equal(all[0].id,409);
+const gains=eventFeed(full,{kind:'gain'});
+const losses=eventFeed(full,{kind:'loss'});
+assert.ok(gains.length>90);
+assert.ok(losses.length>0);
+assert.ok(gains.every(e=>e.team==='Cosa Nostra'));
+assert.ok(losses.every(e=>e.previousOwner==='Cosa Nostra'&&e.team!=='Cosa Nostra'));
+assert.ok(eventFeed(full,{team:'Spiriti'}).every(e=>e.team==='Spiriti'));
+console.log('OK: official 404-event history, team and gains/losses filters');

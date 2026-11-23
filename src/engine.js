@@ -179,3 +179,22 @@ export function findOperations(state,rules,players=4,maxTickets=30){
  return [...pairs,...triples].filter(x=>x.score>0).sort((a,b)=>b.score-a.score||a.cost-b.cost).slice(0,60);
 }
 export function recentCaptures(state,count=15){return (state.orderedEvents||[]).filter(e=>e.ms<=state.asOf).slice(-count).reverse();}
+
+/** Chronological event log with ownership transitions, for the Events page. */
+export function eventFeed(state, filters={}) {
+ const prior=new Map(), rows=[];
+ for(const e of state.orderedEvents||[]){
+  if(e.ms>state.asOf)continue;
+  const previousOwner=prior.get(e.stationId)||null;
+  const kind=!previousOwner?'first':previousOwner===e.team?'reinforce':'takeover';
+  const scope=e.team===MY_TEAM
+    ? (previousOwner===MY_TEAM?'reinforce':'gain')
+    : (previousOwner===MY_TEAM?'loss':'other');
+  rows.push({...e,previousOwner,kind,scope});
+  prior.set(e.stationId,e.team);
+ }
+ return rows.reverse().filter(e=>
+  (!filters.team||filters.team==='all'||e.team===filters.team) &&
+  (!filters.kind||filters.kind==='all'||e.scope===filters.kind||filters.kind==='takeover'&&e.kind==='takeover')
+ );
+}
