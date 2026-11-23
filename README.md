@@ -29,6 +29,12 @@ Uvedený objekt je **jen ukázka formátu, ne skutečné obsazení**. Dodržte �
 
 Úložiště GitHub Pages se po commitu automaticky aktualizuje, pokud je v nastavení repozitáře povolen deploy z větve `main` (kořen `/`). Web načítá data bez cache při otevření a každou minutu přepočítává decay. **Přidání události vyžaduje obnovení stránky.**
 
+## Přehled bodů a jízdenek
+
+- Přepínání **Celkem / Bez území** přepočítává pořadí všech týmů. „Bez území“ obsahuje tramvajové, vlakové a případné metro body.
+- **Jízdenky** se počítají z obsazení mezi 03:00 a následující 02:59:59 v Europe/Prague: tramvajové obsazení stojí počet zabírajících hráčů, vlakové a metro eventy nula. Každý tým má 120 jízdenek na den, reset je ve 03:00. Výpočet vychází z posledního nahraného exportu, nejde o živé saldo serveru.
+- Vlakové obsazení se započítává do skóre jako tramvajové (bez územního bonusu) a přitom nečerpá jízdenky.
+
 ## Události a skóre
 
 - **Události**: filtry podle týmu, vlastních zisků, vlastních ztrát, vlastních posílení a všech převzetí. Historie se počítá chronologicky z `captures.json` podle stabilní zastávky, ne z Discord časů.
