@@ -2,8 +2,8 @@ import {MY_TEAM,fmtTime,fmtShort,reconstruct,impactOf,lossOf,opportunityFor,requ
 const paths=['topology.json','rules.json','checkpoint.json','captures.json'];
 const app=document.querySelector('#app');
 let data={},state,view='overview',players=4,selected=null,search='',sortBy='value',now=Date.now(),operationsCache=[];
-let leafletMap=null,leafletMarkers=null,leafletLines=null;
-let mapViewState={center:[50.087,14.42],zoom:12};
+let strategicMap=null;
+let mapViewState={center:[14.42,50.087],zoom:11.4,userMoved:false};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const teamColor=owner=>({'Cosa Nostra':'#32b968','Spiriti':'#5797db','Zemunski klan':'#a475d8','Yakuza':'#e56a67','Los Bandidos':'#dcb467'})[owner]||'#64746b';
 const cap=n=>Number(n||0).toLocaleString('cs-CZ');
@@ -31,43 +31,35 @@ function operationsView(){
  return `<div class="toolbar"><h2>Společné operace</h2>${personFilter()}</div><section class="panel">${best.map((o,i)=>`<div class="operation"><div class="operation-heading"><b>${i+1}. ${o.ids.map(id=>esc(state.states.get(id).name)).join(' + ')}</b><strong class="good">+${cap(o.ourGain)} nám</strong></div><div class="op-details"><span>${o.maxPlayers} hráčů max.</span><span>${o.cost} jízdenek</span><span class="bad">−${cap(o.opponentLoss)} soupeřům</span><span>Proti lídrovi +${cap(o.leaderGapChange)}</span></div><div class="operation-links">${o.ids.map(id=>`<button class="pill" data-station="${id}">${esc(state.states.get(id).name)} ↗</button>`).join('')}</div></div>`).join('')||'<div class="empty">Pro tuto skupinu zatím žádné dostupné kombinace.</div>'}</section>`;
 }
 function mapView(){const tram=[...state.states.values()].filter(s=>s.category==='tram');
- return `<div class="toolbar"><h2>Herní mapa</h2><span class="note">${tram.length} tramvajových zastávek · ${data.topology.edges.length} spojnic</span></div><div class="map-wrap leaflet-wrap"><div id="leaflet-map" class="leaflet-map" aria-label="Interaktivní mapa Prahy se zastávkami"></div></div><div class="filter" style="margin-top:12px;gap:12px;">${Object.keys(state.scoring).map(t=>`<span class="teamline"><i class="dot" style="background:${teamColor(t)}"></i>${esc(t)}</span>`).join('')}</div>`;}
-function initLeafletMap(){
- const el=document.getElementById('leaflet-map');
- if(!el) return; if(typeof window.L==='undefined'){el.innerHTML='<div class="empty">Mapový podklad se nepodařilo načíst.</div>';return;}
+ return `<div class="toolbar"><h2>Herní mapa</h2><span class="note">${tram.length} zastávek · ${data.topology.edges.length} spojnic</span></div><div class="map-wrap"><div id="strategic-map" class="strategic-map" aria-label="Interaktivní mapa Prahy"></div></div><div class="filter" style="margin-top:12px;gap:12px;">${Object.keys(state.scoring).map(t=>`<span class="teamline"><i class="dot" style="background:${teamColor(t)}"></i>${esc(t)}</span>`).join('')}</div>`;}
+function initStrategicMap(){
+ const el=document.getElementById('strategic-map');if(!el)return;
+ if(!window.maplibregl){el.innerHTML='<div class="empty">Mapový podklad není dostupný.</div>';return;}
  const tram=[...state.states.values()].filter(s=>s.category==='tram'&&Number.isFinite(s.lat)&&Number.isFinite(s.lon));
- if(!leafletMap){
-   leafletMap=L.map(el,{zoomControl:false,minZoom:10,maxZoom:18});
-   L.control.zoom({position:'topright'}).addTo(leafletMap);
-   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(leafletMap);
-   leafletMap.on('moveend zoomend',()=>{const c=leafletMap.getCenter();mapViewState={center:[c.lat,c.lng],zoom:leafletMap.getZoom(),userMoved:true};});
- }
- if(!leafletMap._llHasInitialFit && !mapViewState.userMoved){
-   const bounds=L.latLngBounds(tram.map(s=>[s.lat,s.lon]));
-   leafletMap.fitBounds(bounds.pad(0.08),{animate:false});
-   const c=leafletMap.getCenter();mapViewState={center:[c.lat,c.lng],zoom:leafletMap.getZoom(),userMoved:true};
-   leafletMap._llHasInitialFit=true;
- } else {
-   leafletMap.setView(mapViewState.center,mapViewState.zoom,{animate:false});
- }
- if(leafletLines) leafletLines.remove();
- if(leafletMarkers) leafletMarkers.remove();
- leafletLines=L.layerGroup();
- data.topology.edges.forEach(e=>{
-   const coords=(e.geometry&&e.geometry.length?e.geometry:[[state.states.get(e.from)?.lat,state.states.get(e.from)?.lon],[state.states.get(e.to)?.lat,state.states.get(e.to)?.lon]])
-      .filter(p=>Number.isFinite(p?.[0])&&Number.isFinite(p?.[1]));
-   if(coords.length>=2) L.polyline(coords,{color:'#587066',weight:2,opacity:.68,interactive:false}).addTo(leafletLines);
+ const edges={type:'FeatureCollection',features:data.topology.edges.map(e=>{
+  const coords=(e.geometry?.length?e.geometry:[[state.states.get(e.from)?.lat,state.states.get(e.from)?.lon],[state.states.get(e.to)?.lat,state.states.get(e.to)?.lon]])
+   .filter(pt=>Number.isFinite(pt?.[0])&&Number.isFinite(pt?.[1])).map(([lat,lon])=>[lon,lat]);
+  return {type:'Feature',geometry:{type:'LineString',coordinates:coords},properties:{}};
+ }).filter(f=>f.geometry.coordinates.length>=2)};
+ const stops={type:'FeatureCollection',features:tram.map(s=>({type:'Feature',geometry:{type:'Point',coordinates:[s.lon,s.lat]},properties:{id:s.id,name:s.name,owner:s.owner||'Neutrální',value:s.value,color:teamColor(s.owner)}}))};
+ const map=new maplibregl.Map({container:el,style:'https://tiles.openfreemap.org/styles/liberty',center:mapViewState.center,zoom:mapViewState.zoom,minZoom:9,maxZoom:19,attributionControl:true});
+ strategicMap=map;
+ map.addControl(new maplibregl.NavigationControl({showCompass:false}), 'top-right');
+ map.on('moveend',()=>{if(strategicMap!==map)return;mapViewState={center:map.getCenter().toArray(),zoom:map.getZoom(),userMoved:true};});
+ map.on('load',()=>{
+  if(strategicMap!==map)return;
+  try{applyGameMapStyle(map);}catch(err){console.warn('Úprava mapového stylu:',err);}
+  map.addSource('game-edges',{type:'geojson',data:edges});
+  map.addLayer({id:'game-edges',type:'line',source:'game-edges',paint:{'line-color':'#6f8b7a','line-width':['interpolate',['linear'],['zoom'],10,1,14,2.2,18,3],'line-opacity':.7}});
+  map.addSource('game-stops',{type:'geojson',data:stops});
+  map.addLayer({id:'game-stops-hit',type:'circle',source:'game-stops',paint:{'circle-radius':14,'circle-opacity':0,'circle-stroke-opacity':0}});
+  map.addLayer({id:'game-stops-visible',type:'circle',source:'game-stops',paint:{'circle-radius':['interpolate',['linear'],['zoom'],10,3.4,13,5.5,17,8.5], 'circle-color':['get','color'],'circle-stroke-color':'#111715','circle-stroke-width':1.5,'circle-opacity':.98}});
+  map.on('mouseenter','game-stops-hit',()=>map.getCanvas().style.cursor='pointer');
+  map.on('mouseleave','game-stops-hit',()=>map.getCanvas().style.cursor='');
+  map.on('click','game-stops-hit',ev=>{const f=ev.features?.[0];if(f){selected=Number(f.properties.id);render();}});
+  if(!mapViewState.userMoved){const bounds=new maplibregl.LngLatBounds();tram.forEach(s=>bounds.extend([s.lon,s.lat]));map.fitBounds(bounds,{padding:24,maxZoom:12.5,duration:0});}
  });
- leafletLines.addTo(leafletMap);
- leafletMarkers=L.layerGroup();
- tram.forEach(s=>{
-   const marker=L.circleMarker([s.lat,s.lon],{radius:selected===s.id?8:6,fillColor:teamColor(s.owner),fillOpacity:.96,color:selected===s.id?'#ffffff':'#0b1110',weight:selected===s.id?3:1.5});
-   marker.bindTooltip(`${s.name} · ${s.owner||'Neutrální'} · ${s.value}`,{direction:'top',offset:[0,-8]});
-   marker.on('click',()=>{selected=s.id;render();});
-   marker.addTo(leafletMarkers);
- });
- leafletMarkers.addTo(leafletMap);
- setTimeout(()=>leafletMap.invalidateSize(),0);
+ map.on('error',ev=>{console.warn('MapLibre:',ev.error?.message||ev);});
 }
 function stationDetail(id){
  const s=state.states.get(id);if(!s)return '';
@@ -85,7 +77,7 @@ function stationDetail(id){
  <div class="metric"><span>Herní sousedé</span><span class="neighbors">${(s.neighbors||[]).map(n=>`<button class="pill" data-station="${n}">${esc(state.states.get(n)?.name||n)}</button>`).join('')||'Žádní'}</span></div></section>`;
 }
 
-function render(){if(leafletMap){leafletMap.remove();leafletMap=null;leafletMarkers=null;leafletLines=null;}const body=view==='overview'?overview():view==='map'?mapView():view==='targets'?attackView():view==='operations'?operationsView():view==='opportunities'?opportunitiesView():defenseView();app.innerHTML=`<div class="app">${top()}${nav()}${selected!==null?stationDetail(selected):body}</div>`; if(view==='map'&&selected===null) initLeafletMap();}
+function render(){if(strategicMap){const m=strategicMap;strategicMap=null;m.remove();}const body=view==='overview'?overview():view==='map'?mapView():view==='targets'?attackView():view==='operations'?operationsView():view==='opportunities'?opportunitiesView():defenseView();app.innerHTML=`<div class="app">${top()}${nav()}${selected!==null?stationDetail(selected):body}</div>`; if(view==='map'&&selected===null) initStrategicMap();}
 app.addEventListener('click',e=>{const st=e.target.closest('[data-station]');if(st){selected=Number(st.dataset.station);render();return;}const v=e.target.closest('[data-view]');if(v){selected=null;view=v.dataset.view;render();return;}if(e.target.closest('#close-detail')){selected=null;render();}});
 app.addEventListener('change',e=>{if(e.target.id==='players'){players=Number(e.target.value);operationsCache=[];render();}if(e.target.id==='sort'){sortBy=e.target.value;render();}});
 app.addEventListener('input',e=>{if(e.target.id==='search'){search=e.target.value; const pos=e.target.selectionStart;render();const el=document.getElementById('search');el?.focus();el?.setSelectionRange(pos,pos);}});
