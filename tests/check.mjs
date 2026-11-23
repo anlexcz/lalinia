@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-import {reconstruct,impactOf,lossOf,opportunityFor,parseCaptureTime,stationHistory,findOperations,evaluateOperation,eventFeed} from '../src/engine.js';
+import {reconstruct,impactOf,lossOf,opportunityFor,parseCaptureTime,stationHistory,findOperations,evaluateOperation,eventFeed,dailyTickets,gameDayKey,displayedScore} from '../src/engine.js';
 const read=name=>JSON.parse(fs.readFileSync(new URL('../data/'+name+'.json',import.meta.url)));
 const topology=read('topology'),rules=read('rules'),checkpoint=read('checkpoint'),events=read('captures');
 const at=parseCaptureTime('23. 11. 2026, 05:00:00');
@@ -49,3 +49,20 @@ assert.ok(gains.every(e=>e.team==='Cosa Nostra'));
 assert.ok(losses.every(e=>e.previousOwner==='Cosa Nostra'&&e.team!=='Cosa Nostra'));
 assert.ok(eventFeed(full,{team:'Spiriti'}).every(e=>e.team==='Spiriti'));
 console.log('OK: official 404-event history, team and gains/losses filters');
+
+const daily=dailyTickets(full,rules,recent);
+assert.equal(daily.day,'2026-11-23');
+assert.equal(daily.limit,120);
+assert.equal(daily.teams['Cosa Nostra'].spent,120);
+assert.equal(daily.teams['Cosa Nostra'].remaining,0);
+assert.equal(daily.teams['Spiriti'].remaining,2);
+assert.equal(daily.teams['Yakuza'].remaining,4);
+assert.equal(daily.teams['Zemunski klan'].remaining,56);
+assert.equal(daily.teams['Los Bandidos'].remaining,120);
+assert.equal(dailyTickets(full,rules,parseCaptureTime('24. 11. 2026, 02:59:59')).teams['Cosa Nostra'].remaining,0);
+assert.equal(dailyTickets(full,rules,parseCaptureTime('24. 11. 2026, 03:00:00')).teams['Cosa Nostra'].remaining,120);
+assert.equal(gameDayKey(parseCaptureTime('24. 11. 2026, 02:59:59')),'2026-11-23');
+assert.equal(displayedScore(full.scoring['Cosa Nostra'],false),full.scoring['Cosa Nostra'].total-full.scoring['Cosa Nostra'].area);
+assert.equal(displayedScore(full.scoring['Cosa Nostra'],true),full.scoring['Cosa Nostra'].total);
+assert.equal(full.warnings.length,0,full.warnings.join(' | '));
+console.log('OK: ticket reset at 03:00, all team budgets, clean vs total score, train events');

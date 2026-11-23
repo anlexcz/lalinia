@@ -48,3 +48,20 @@
 .event-right span{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
 .load-more{display:block;width:100%;padding:12px;background:var(--surface);border:1px solid var(--stroke);color:var(--text);margin-top:10px}
 @media(max-width:800px){.nav{grid-template-columns:repeat(7,minmax(0,1fr))}.nav button{font-size:clamp(8px,2.15vw,10px);letter-spacing:-.45px}.score-strip{gap:10px}.event-list{padding:0 11px}.event-right{max-width:118px}}
+
+/* Kompaktní přehled: dva způsoby bodování a denní jízdenky všech týmů. */
+.score-panel{padding:12px 14px;margin-bottom:12px}
+.score-panel-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
+.score-panel-head h3{margin:0}
+.score-modes{display:flex;border:1px solid var(--stroke);background:var(--surface2);padding:2px;gap:2px}
+.score-modes button{border:0;background:transparent;color:var(--muted);padding:7px 9px;min-height:29px;font-size:10px;font-weight:700;white-space:nowrap}
+.score-modes button.active{background:var(--accent);color:#fff}
+.score-head,.score-row{display:grid;grid-template-columns:minmax(0,1fr) 65px 82px;align-items:center;gap:9px}
+.score-head{font-size:10px;color:var(--muted);padding-bottom:6px;border-bottom:1px solid var(--stroke)}
+.score-head span:nth-child(n+2){text-align:right}
+.score-row{border-bottom:1px solid var(--stroke);min-height:42px;font-variant-numeric:tabular-nums}
+.score-row:last-child{border-bottom:0}
+.score-row strong{text-align:right;font-size:13px}
+.score-row .teamline{min-width:0;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ticket-remaining{text-align:right;color:var(--muted);font-size:11px}
+@media(max-width:800px){.score-panel{padding:12px 10px}.score-head,.score-row{grid-template-columns:minmax(0,1fr) 55px 69px;gap:5px}.score-row .teamline{font-size:10px}.score-row strong{font-size:12px}.ticket-remaining{font-size:10px}}

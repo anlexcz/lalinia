@@ -82,7 +82,11 @@ export function reconstruct(topology,rules,checkpoint,events,now=Date.now()){
    if(station.category==='tram'){
      if(oldOwner===e.team)add(e.team,'tram',(e.value-oldValue)*multiplier);
      else {if(oldOwner && scoring[oldOwner])add(oldOwner,'tram',-oldValue*multiplier);add(e.team,'tram',e.value*multiplier+(oldOwner?0:rules.first_capture_bonus));}
-   }else if(station.category==='train') {warnings.push(`Událost ${e.id}: bodování vlakové události nelze automaticky ověřit; skóre může být nepřesné`);}
+   }else if(station.category==='train') {
+     // Vlakové eventy se bodují jako tramvajové zastávky, ale nečerpají jízdenky.
+     if(oldOwner===e.team)add(e.team,'train',(e.value-oldValue)*multiplier);
+     else {if(oldOwner && scoring[oldOwner])add(oldOwner,'train',-oldValue*multiplier);add(e.team,'train',e.value*multiplier+(oldOwner?0:rules.first_capture_bonus));}
+   }
    // Update raw ownership state and refresh area bonuses after each capture.
    previous.owner=e.team; previous.value=e.value; owners.set(e.stationId,e.team);
    const newer=areaOf(owners,graph,rules).scores;
@@ -198,3 +202,24 @@ export function eventFeed(state, filters={}) {
   (!filters.kind||filters.kind==='all'||e.scope===filters.kind||filters.kind==='takeover'&&e.kind==='takeover')
  );
 }
+
+// Všechna herní období mají v roce 2026 časové pásmo Europe/Prague.
+export function gameDayKey(ms, resetHour=3){
+ const parts=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Prague',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'}).formatToParts(new Date(ms)).map(p=>[p.type,p.value]));
+ const t=Date.UTC(+parts.year,+parts.month-1,+parts.day)-(Number(parts.hour)<resetHour?86400000:0);
+ return new Date(t).toISOString().slice(0,10);
+}
+/** Jízdenky platí pro tým a herní den; vlak ani metro je nespotřebovávají. */
+export function dailyTickets(state,rules,when=state.asOf){
+ const limit=Number(rules.tickets_per_day??120),day=gameDayKey(when,Number(rules.reset_hour_prague??3));
+ const tickets=Object.fromEntries(Object.keys(state.scoring).map(t=>[t,{spent:0,remaining:limit,captures:0,limit}]));
+ for(const e of state.orderedEvents||[]){
+  if(e.ms>when||e.category!=='tram'||gameDayKey(e.ms,Number(rules.reset_hour_prague??3))!==day)continue;
+  if(!tickets[e.team])continue;
+  tickets[e.team].spent+=e.value*Number(rules.tickets_per_player??1);
+  tickets[e.team].captures++;
+ }
+ for(const entry of Object.values(tickets))entry.remaining=Math.max(0,limit-entry.spent);
+ return {day,limit,teams:tickets};
+}
+export function displayedScore(score,includeArea=true){return score.total-(includeArea?0:score.area);}
