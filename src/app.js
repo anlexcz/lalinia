@@ -125,16 +125,19 @@ function initStrategicMap(){
  tiles.on('tileerror',()=>{tilesFailed++;if(tilesFailed>=4&&!tilesLoaded&&!el.querySelector('.map-load-warning')){const warning=document.createElement('div');warning.className='map-load-warning';warning.textContent='Podklad nedostupný';el.appendChild(warning);}});
  tiles.addTo(map);
  map.on('moveend zoomend',()=>{if(strategicMap!==map)return;const center=map.getCenter();mapViewState={center:[center.lng,center.lat],zoom:map.getZoom(),userMoved:true};});
- // Herní spojnice jsou kreslené NAD mapovými dlaždicemi. Kontrastní obrys zůstává
- // čitelný i na šedém podkladu a světlejší střed odlišuje linku od silnic.
+ // Spojnice vyjadřují pouze skutečně propojená území: obě koncové
+ // tramvajové zastávky musejí patřit STEJNÉMU nenulovému týmu.
+ // Hrany mezi soupeři ani neutrálními zastávkami se nekreslí.
  const edgeHalo=map.createPane('edge-halo'),edgeLine=map.createPane('edge-lines');
  edgeHalo.style.zIndex='410';edgeLine.style.zIndex='415';
  edgeHalo.style.pointerEvents='none';edgeLine.style.pointerEvents='none';
- if(mapEdges)data.topology.edges.forEach(e=>{
-  const coords=(e.geometry?.length?e.geometry:[[state.states.get(e.from)?.lat,state.states.get(e.from)?.lon],[state.states.get(e.to)?.lat,state.states.get(e.to)?.lon]]).filter(p=>Number.isFinite(p?.[0])&&Number.isFinite(p?.[1]));
+ if(mapEdges&&mapTram)data.topology.edges.forEach(e=>{
+  const from=state.states.get(e.from),to=state.states.get(e.to);
+  if(!from||!to||from.category!=='tram'||to.category!=='tram'||!from.owner||from.owner!==to.owner)return;
+  const coords=(e.geometry?.length?e.geometry:[[from.lat,from.lon],[to.lat,to.lon]]).filter(p=>Number.isFinite(p?.[0])&&Number.isFinite(p?.[1]));
   if(coords.length>=2){
    L.polyline(coords,{pane:'edge-halo',color:'#0d1712',weight:5.5,opacity:.95,interactive:false,smoothFactor:1}).addTo(map);
-   L.polyline(coords,{pane:'edge-lines',color:'#a6d9b5',weight:2.8,opacity:1,interactive:false,smoothFactor:1}).addTo(map);
+   L.polyline(coords,{pane:'edge-lines',color:teamColor(from.owner),weight:3,opacity:1,interactive:false,smoothFactor:1}).addTo(map);
   }
  });
  points.forEach(s=>{
