@@ -3868,5 +3868,23 @@
     "team": "Yakuza",
     "value": 4,
     "author": "Jakub Moc"
+  },
+  {
+    "id": 436,
+    "datetime": "24. 11. 2026, 17:11:34",
+    "station": "Malovanka",
+    "category": "tram",
+    "team": "Yakuza",
+    "value": 4,
+    "author": "Jakub Moc"
+  },
+  {
+    "id": 437,
+    "datetime": "24. 11. 2026, 17:17:23",
+    "station": "Královka",
+    "category": "tram",
+    "team": "Yakuza",
+    "value": 4,
+    "author": "Keegi"
   }
 ]
