@@ -244,9 +244,16 @@
 
 /* Upcoming decay: separate dashed ring, never replaces team fill. */
 .decay-yellow{--decay-color:#facc15}.decay-orange{--decay-color:#fb923c}.decay-red{--decay-color:#ef4444}
-.map-point,.decay-symbol{position:relative}
-.map-point:is(.decay-yellow,.decay-orange,.decay-red)::after,.decay-symbol:is(.decay-yellow,.decay-orange,.decay-red)::after{content:"";position:absolute;inset:-5px;border:2px dashed var(--decay-color);border-radius:50%;pointer-events:none}
+.map-point{position:relative}
+.map-point:is(.decay-yellow,.decay-orange,.decay-red)::after{content:"";position:absolute;inset:-5px;border:2px dashed var(--decay-color);border-radius:50%;pointer-events:none}
 .strategic-map.map-distant .map-point:is(.decay-yellow,.decay-orange,.decay-red)::after{border-width:4px}
 .strategy-row.decay-row{display:flex;align-items:center;gap:12px;text-align:left;width:100%}
-.decay-symbol{display:grid;place-items:center;flex:0 0 25px;width:25px;height:25px;border-radius:50%;border:1px solid #121715;color:white;font-weight:800;margin:4px}
 .decay-row .strategy-subject{flex:1;min-width:0}.decay-row .strategy-scores{margin-left:auto;text-align:right;flex-shrink:0}.decay-row .decay-time{color:var(--decay-color,var(--muted))}
+
+/* Compact decay list: team stripe, countdown first, rings only on map. */
+.strategy-row.decay-row{display:grid;grid-template-columns:3px minmax(0,1fr) auto;gap:10px;padding:10px 0;align-items:center}
+.strategy-row.decay-row>.decay-team-stripe{width:3px;min-width:3px;height:32px;flex:none}
+.decay-row .strategy-subject{min-width:0}.decay-row .strategy-subject small{line-height:1.35}
+.decay-row .strategy-scores{white-space:nowrap}.decay-row .strategy-scores>.decay-time{color:var(--decay-color,var(--text));font-variant-numeric:tabular-nums}
+.operation-filters.decay-filters{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.decay-filters .filter{display:block;min-width:0;margin:0}.decay-filters select,.decay-filters input{width:100%;min-width:0;box-sizing:border-box;height:40px;padding:8px;font-size:12px}
