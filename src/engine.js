@@ -97,9 +97,16 @@ export function reconstruct(topology,rules,checkpoint,events,now=Date.now()){
    const changes={};for(const name of Object.keys(scoring)){const before=scoresBefore[name],after=scoring[name];const direct=(after.tram-before.tram)+(after.train-before.train)+(after.metro-before.metro);const area=after.area-before.area;if(direct||area)changes[name]={direct,area,total:direct+area};}
    impactByEvent.set(e.id,{changes,previousOwner:oldOwner,oldValue,retainedOnTakeover:oldOwner&&oldOwner!==e.team?Math.max(0,((existing?.value??previous.value)-oldValue)*multiplier):0});
  }
- const states=new Map();for(const s of topology.stations){const cp=base.get(s.id),capture=latestByStation.get(s.id);const owner=cp?.owner||null;const value=capture?valueAt(capture,rules,now):cp?.value||0;
-   const transitions=timeline(capture,rules);const pending=transitions.filter(x=>x.at>now);
-   states.set(s.id,{...s,owner,value,capture:capture||null,transitions,pending,needed:requiredPlayers(value,owner,rules),protectedUntil:capture?capture.ms+rules.protection_minutes*60000:null});
+ const states=new Map();for(const s of topology.stations){const cp=base.get(s.id),capture=latestByStation.get(s.id);const owner=cp?.owner||null;
+   // Train events can be contested only during their own game day (03:00–02:59:59).
+   // After 03:00 the final train value and ownership are locked; tram decay continues normally.
+   const lockAt=s.category==='train'&&capture?trainLockAt(capture.ms,rules):null;
+   const locked=lockAt!==null&&now>=lockAt;
+   const effectiveNow=locked?lockAt-1:now;
+   const value=capture?valueAt(capture,rules,effectiveNow):cp?.value||0;
+   const transitions=s.category==='train'?timeline(capture,rules).filter(x=>x.at<lockAt):timeline(capture,rules);
+   const pending=transitions.filter(x=>x.at>now);
+   states.set(s.id,{...s,owner,value,capture:capture||null,transitions,pending,locked,lockAt,needed:locked?null:requiredPlayers(value,owner,rules),protectedUntil:locked?null:capture?capture.ms+rules.protection_minutes*60000:null});
  }
  const history=new Map();for(const e of ordered){if(!history.has(e.stationId))history.set(e.stationId,[]);history.get(e.stationId).push(e);}
  return {graph,states,scoring,history,orderedEvents:ordered,impactByEvent,asOf:now,errors,warnings,eventsCount:ordered.length,added,checkpointId:checkpoint.checkpoint_event_id,latestEvent:ordered.length?ordered.at(-1).ms:null};
@@ -210,6 +217,12 @@ export function eventFeed(state, filters={}) {
 }
 
 // Všechna herní období mají v roce 2026 časové pásmo Europe/Prague.
+/** End of the single eligible train-event game day (all 2026 game dates are CET). */
+export function trainLockAt(ms,rules={}) {
+ const resetHour=Number(rules.reset_hour_prague??3);
+ const day=gameDayKey(ms,resetHour);
+ return Date.parse(day+'T'+String(resetHour).padStart(2,'0')+':00:00+01:00')+86400000;
+}
 export function gameDayKey(ms, resetHour=3){
  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Prague',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'}).formatToParts(new Date(ms)).map(p=>[p.type,p.value]));
  const t=Date.UTC(+parts.year,+parts.month-1,+parts.day)-(Number(parts.hour)<resetHour?86400000:0);
