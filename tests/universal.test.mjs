@@ -49,19 +49,30 @@ const kolovraty=top.stations.find(s=>s.category==='train'&&s.name==='Kolovraty')
 assert.equal(muchLater.states.get(kolovraty).owner,'Zemunski klan','same-day train takeover remains valid');
 assert.equal(muchLater.scoring['Zemunski klan'].train,24);
 
-// Train captures are won by a strictly larger group, with no decay even 12+ hours later.
-const sataliceId=top.stations.find(s=>s.category==='train'&&s.name==='Satalice').id;
-const sataliceBefore=reconstruct(top,rules,checkpoint,events,parseCaptureTime('21. 11. 2026, 20:00:00'));
-assert.equal(sataliceBefore.states.get(sataliceId).value,4,'train value stays at last group's size');
-assert.equal(sataliceBefore.states.get(sataliceId).needed,5);
-assert.equal(afterLock.states.get(sataliceId).value,6,'winning train group is retained without decay');
-assert.equal(afterLock.states.get(sataliceId).owner,'Cosa Nostra');
+// A new train event opens at 03:00, never decays and closes at the next 03:00.
+const newTrainName='Běchovice střed';
+const newTrainId=top.stations.find(s=>s.category==='train'&&s.name===newTrainName).id;
+const train4={id:900,datetime:'24. 11. 2026, 04:00:00',station:newTrainName,category:'train',team:'Cosa Nostra',value:4,author:'TEST'};
+const train5={id:901,datetime:'24. 11. 2026, 20:00:00',station:newTrainName,category:'train',team:'Yakuza',value:5,author:'TEST'};
+const noIncrease={...train5,id:902,value:5,team:'Spiriti',datetime:'24. 11. 2026, 22:00:00'};
+const tooLate={...train5,id:903,value:6,team:'Spiriti',datetime:'25. 11. 2026, 03:00:00'};
+const trainOpen=reconstruct(top,rules,checkpoint,[...events,train4],parseCaptureTime('24. 11. 2026, 19:00:00'));
+assert.equal(trainOpen.states.get(newTrainId).value,4);
+assert.equal(trainOpen.states.get(newTrainId).needed,5);
+assert.deepEqual(trainOpen.states.get(newTrainId).transitions,[]);
+assert.deepEqual(trainOpen.states.get(newTrainId).pending,[]);
+const trainTaken=reconstruct(top,rules,checkpoint,[...events,train4,train5],parseCaptureTime('24. 11. 2026, 23:00:00'));
+assert.equal(trainTaken.states.get(newTrainId).value,5);
+assert.equal(trainTaken.states.get(newTrainId).owner,'Yakuza');
+const invalid=reconstruct(top,rules,checkpoint,[...events,train4,train5,noIncrease,tooLate],parseCaptureTime('25. 11. 2026, 04:00:00'));
+assert.equal(invalid.states.get(newTrainId).value,5);
+assert.equal(invalid.states.get(newTrainId).owner,'Yakuza');
+assert.equal(invalid.states.get(newTrainId).locked,true);
+assert.equal(invalid.warnings.filter(x=>x.includes('Neplatná vlaková událost')).length,2);
+assert.equal(invalid.scoring.Spiriti.train,trainTaken.scoring.Spiriti.train,'invalid train events award no points');
 assert.deepEqual(beforeLock.states.get(braníkId).transitions,[],'train events have no decay timeline');
-// There is no future decay to show even while the train event is still open.
-const early=reconstruct(top,rules,checkpoint,events,parseCaptureTime('21. 11. 2026, 20:00:00'));
-assert.deepEqual(early.states.get(braníkId).pending,[]);
-assert.equal(early.states.get(braníkId).needed,9);
-
+assert.equal(beforeLock.states.get(braníkId).needed,9);
+assert.equal(afterLock.states.get(top.stations.find(s=>s.category==='train'&&s.name==='Satalice').id).value,6);
 console.log('OK: trains lock at 03:00, preserve their owner and value, retain scores and use zero tickets');
 
 console.log('OK: universal team scores, decay retention, event changes, event filters and team-based operations');
