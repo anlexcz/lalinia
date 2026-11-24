@@ -4309,5 +4309,14 @@
     "team": "Cosa Nostra",
     "value": 7,
     "author": "Ester"
+  },
+  {
+    "id": 485,
+    "datetime": "24. 11. 2026, 21:39:20",
+    "station": "Libuš",
+    "category": "tram",
+    "team": "Zemunski klan",
+    "value": 4,
+    "author": "Štěpán Sviták"
   }
 ]
