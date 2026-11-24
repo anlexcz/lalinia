@@ -83,9 +83,9 @@ export function reconstruct(topology,rules,checkpoint,events,now=Date.now()){
      if(oldOwner===e.team)add(e.team,'tram',(e.value-oldValue)*multiplier);
      else {if(oldOwner && scoring[oldOwner])add(oldOwner,'tram',-oldValue*multiplier);add(e.team,'tram',e.value*multiplier+(oldOwner?0:rules.first_capture_bonus));}
    }else if(station.category==='train') {
-     // Vlakové eventy se bodují jako tramvajové zastávky, ale nečerpají jízdenky.
+     // Vlakové eventy nečerpají jízdenky; oficiální skóre potvrzuje, že první vlakové obsazení nemá +2 bonus.
      if(oldOwner===e.team)add(e.team,'train',(e.value-oldValue)*multiplier);
-     else {if(oldOwner && scoring[oldOwner])add(oldOwner,'train',-oldValue*multiplier);add(e.team,'train',e.value*multiplier+(oldOwner?0:rules.first_capture_bonus));}
+     else {if(oldOwner && scoring[oldOwner])add(oldOwner,'train',-oldValue*multiplier);add(e.team,'train',e.value*multiplier);}
    }
    // Update raw ownership state and refresh area bonuses after each capture.
    previous.owner=e.team; previous.value=e.value; owners.set(e.stationId,e.team);
