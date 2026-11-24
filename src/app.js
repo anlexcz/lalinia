@@ -84,7 +84,8 @@ function strategyView(){
   return `<button class="strategy-row" data-station="${t.station.id}"><span><b>${esc(t.station.name)}</b><small>${esc(t.owner||'Neutrální')} · ${t.cost} hráčů / jízdenek</small></span><span class="strategy-scores"><b class="good">+${cap(t.gain)} celkem</b><small>+${cap(direct)} přímé</small>${t.owner?`<b class="bad">−${cap(t.enemyLoss)} soupeř</b><small>−${cap(lost)} přímé</small>`:''}</span></button>`;
  }).join(''):defenses().slice(0,100).map(t=>{
   const mult=t.station.is_terminus?data.rules.terminus_multiplier:1;
-  return `<button class="strategy-row" data-station="${t.station.id}"><span><b>${esc(t.station.name)}</b><small>Hodnota ${t.station.value} · potřebuje ${t.needed} hráčů</small></span><span class="strategy-scores"><b class="bad">−${cap(t.loss)} celkem</b><small>−${cap(t.station.value*mult)} přímé</small></span></button>`;
+  const attacker=opponent==='all'?null:impactOf(state,t.station.id,data.rules,opponent);
+  return `<button class="strategy-row" data-station="${t.station.id}"><span><b>${esc(t.station.name)}</b><small>Hodnota ${t.station.value} · potřebuje ${t.needed} hráčů</small></span><span class="strategy-scores"><b class="bad">−${cap(t.loss)} celkem</b><small>−${cap(t.station.value*mult)} přímé</small>${attacker?`<b class="good">+${cap(attacker.gain)} soupeř</b><small>+${cap(attacker.cost*mult)} přímé</small>`:''}</span></button>`;
  }).join('');
  return `<div class="toolbar"><h2>Operace · ${esc(selectedTeam)}</h2>${modes}</div><div class="operation-filters">${personFilter()}${targetsHtml}</div><section class="panel strategy-list">${items||'<div class="empty">Žádný odpovídající cíl.</div>'}</section>`;
 }
