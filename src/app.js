@@ -212,15 +212,15 @@ function stationDetail(id){
   const kept=s.capture?Math.max(0,(s.capture.value-s.value)*mult):0;
   scoreHtml=`<div class="detail-section"><h3>Možná ztráta</h3>${metric('Přímé body',number(-directLoss),'bad')}${metric('Celkem s územím',number(-risk.loss),'bad')}${kept?metric('Zůstane díky decay',number(kept),'good'):''}<p class="detail-caption">Zisk případného útočníka nelze bez jeho týmu určit.</p></div>`;
  }else if(s.category==='train'){
-  scoreHtml='<div class="detail-section"><h3>Vlakový event</h3><p class="detail-caption">Územní ani tramvajový model útoku se na tento event nepoužívá.</p></div>';
+  scoreHtml=`<div class="detail-section"><h3>Vlakový event</h3><p class="detail-caption">${s.locked?'Uzamčeno od '+fmtTime(s.lockAt)+'. Vlastník i konečná hodnota jsou pevné; další decay ani převzetí už nejsou možné.':'Lze přebírat do '+fmtTime(s.lockAt)+'. Vlakové obsazení nečerpá jízdenky a nevytváří území.'}</p></div>`;
  }
  return `<section class="panel detail"><div class="detail-top"><div class="detail-heading"><div class="eyebrow">DETAIL ZASTÁVKY</div><div class="detail-name-line"><h2 class="${s.is_terminus?'terminus-name':''}" ${s.is_terminus?'title="Konečná zastávka: přímé body ×2"':''}>${esc(s.name)}</h2><span class="detail-value ${s.category==='train'?'train':''}" style="background:${teamColor(s.owner)}">${s.value}</span></div><span class="teamline"><i class="dot" style="background:${teamColor(s.owner)}"></i>${esc(s.owner||'Neutrální')}${s.is_terminus?' · konečná':''}</span></div><button id="close-detail" aria-label="Zavřít detail zastávky" title="Zavřít detail" type="button">×</button></div>
  <div class="detail-section detail-facts">
- ${metric('K převzetí',s.needed+' hráči')}
+ ${s.category==='train'&&s.locked?metric('Stav','Uzamčeno'):metric('K převzetí',s.needed+' hráči')}
  ${s.capture?metric('Poslední obsazení',fmtTime(s.capture.ms))+metric('Poslední skupina',s.capture.value+' hráči')+metric('Ochrana',currentProtection?'Do '+fmtTime(s.protectedUntil):'Ukončena',currentProtection?'bad':''):'<p class="note">Zatím bez zaznamenaného obsazení.</p>'}
  </div>
  ${scoreHtml}
- <div class="detail-section"><h3>Budoucí decay</h3>${decay}</div>
+ ${s.category==='train'&&s.locked?'':`<div class="detail-section"><h3>Budoucí decay</h3>${decay}</div>`}
  <div class="detail-section"><h3>Historie obsazení <span class="detail-count">(${history.length})</span></h3><div class="history-list">${historyHtml}</div></div></section>`;
 }
 
