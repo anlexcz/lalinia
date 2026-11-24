@@ -4300,5 +4300,14 @@
     "team": "Cosa Nostra",
     "value": 7,
     "author": "Dex"
+  },
+  {
+    "id": 484,
+    "datetime": "24. 11. 2026, 20:52:27",
+    "station": "Krč",
+    "category": "train",
+    "team": "Cosa Nostra",
+    "value": 7,
+    "author": "Ester"
   }
 ]
