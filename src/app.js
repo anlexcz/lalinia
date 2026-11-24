@@ -111,7 +111,7 @@ function mapView(){
 function initStrategicMap(){
  const el=document.getElementById('strategic-map');if(!el)return;
  if(typeof window.L==='undefined'){el.innerHTML='<div class="empty">Mapovou knihovnu se nepodařilo načíst.</div>';return;}
- const points=[...state.states.values()].filter(s=>((s.category==='tram'&&mapTram)||(s.category==='train'&&mapTrain))&&Number.isFinite(s.lat)&&Number.isFinite(s.lon));
+ const points=[...state.states.values()].filter(s=>((s.category==='tram'&&mapTram)||(s.category==='train'&&mapTrain&&s.value>0))&&Number.isFinite(s.lat)&&Number.isFinite(s.lon));
  const map=L.map(el,{zoomControl:false,minZoom:9,maxZoom:19,preferCanvas:true,scrollWheelZoom:true});
  strategicMap=map;
  map.setView([mapViewState.center[1],mapViewState.center[0]],mapViewState.zoom,{animate:false});
@@ -125,9 +125,17 @@ function initStrategicMap(){
  tiles.on('tileerror',()=>{tilesFailed++;if(tilesFailed>=4&&!tilesLoaded&&!el.querySelector('.map-load-warning')){const warning=document.createElement('div');warning.className='map-load-warning';warning.textContent='Podklad nedostupný';el.appendChild(warning);}});
  tiles.addTo(map);
  map.on('moveend zoomend',()=>{if(strategicMap!==map)return;const center=map.getCenter();mapViewState={center:[center.lng,center.lat],zoom:map.getZoom(),userMoved:true};});
+ // Herní spojnice jsou kreslené NAD mapovými dlaždicemi. Kontrastní obrys zůstává
+ // čitelný i na šedém podkladu a světlejší střed odlišuje linku od silnic.
+ const edgeHalo=map.createPane('edge-halo'),edgeLine=map.createPane('edge-lines');
+ edgeHalo.style.zIndex='410';edgeLine.style.zIndex='415';
+ edgeHalo.style.pointerEvents='none';edgeLine.style.pointerEvents='none';
  if(mapEdges)data.topology.edges.forEach(e=>{
   const coords=(e.geometry?.length?e.geometry:[[state.states.get(e.from)?.lat,state.states.get(e.from)?.lon],[state.states.get(e.to)?.lat,state.states.get(e.to)?.lon]]).filter(p=>Number.isFinite(p?.[0])&&Number.isFinite(p?.[1]));
-  if(coords.length>=2)L.polyline(coords,{color:'#7b9384',weight:2,opacity:.78,interactive:false}).addTo(map);
+  if(coords.length>=2){
+   L.polyline(coords,{pane:'edge-halo',color:'#0d1712',weight:5.5,opacity:.95,interactive:false,smoothFactor:1}).addTo(map);
+   L.polyline(coords,{pane:'edge-lines',color:'#a6d9b5',weight:2.8,opacity:1,interactive:false,smoothFactor:1}).addTo(map);
+  }
  });
  points.forEach(s=>{
    const icon=L.divIcon({html:'<div class="map-point '+(s.category==='train'?'train':'')+'" style="background:'+teamColor(s.owner)+'">'+s.value+'</div>',className:'map-point-wrap',iconSize:[27,27],iconAnchor:[13,13]});
