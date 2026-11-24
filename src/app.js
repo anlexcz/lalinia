@@ -4,6 +4,7 @@ const liveCaptures='https://raw.githubusercontent.com/anlexcz/lalinia/main/data/
 const app=document.querySelector('#app');
 let data={},state,view='overview',players=4,selected=null,search='',sortBy='value',now=Date.now(),operationsCache=[],showAreaPoints=true,eventTeam='all',eventKind='all',eventsLimit=40,includeAreaScore=true;
 let strategicMap=null;
+let selectedTeam=(()=>{try{return localStorage.getItem('lalinia-team')||'Cosa Nostra'}catch{return 'Cosa Nostra'}})(),expandedScore=null,operationTab='attack',opponent='all',mapTram=true,mapTrain=true,mapEdges=true,eventSearch='';
 let mapViewState={center:[14.42,50.087],zoom:11.4,userMoved:false};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const teamColor=owner=>({'Cosa Nostra':'#32b968','Spiriti':'#5797db','Zemunski klan':'#a475d8','Yakuza':'#e56a67','Los Bandidos':'#dcb467'})[owner]||'#64746b';
@@ -33,32 +34,33 @@ async function load(){
  }catch(e){app.innerHTML=`<div class="loading bad">Nelze načíst data: ${esc(e.message)}</div>`;}
 }
 function refresh(){now=Date.now();state=reconstruct(data.topology,data.rules,data.checkpoint,data.captures,now);operationsCache=[];render();}
-function nav(){return `<nav class="nav">${[['overview','Přehled'],['map','Mapa'],['targets','Útok'],['operations','Operace'],['opportunities','Decay'],['defense','Obrana'],['events','Události']].map(([id,name])=>`<button data-view="${id}" class="${view===id?'active':''}">${name}</button>`).join('')}</nav>`;}
-function top(){let issue=state.errors.length?`<div class="warning"><b>${state.errors.length} chyb ve vstupních událostech</b><p>${state.errors.slice(0,4).map(esc).join('<br>')}</p></div>`:'';
- const freshness=state.latestEvent?fmtTime(state.latestEvent):'bez událostí';
- return `<header class="top"><div><div class="eyebrow">LA LINIA</div><h1>Cosa Nostra</h1></div><div class="stamp">Data <b>${freshness}</b></div></header>${issue}${state.warnings.length?`<div class="warning">${state.warnings.length} upozornění při rekonstrukci. ${esc(state.warnings[0])}</div>`:''}`;}
+function nav(){return `<nav class="nav">${[['overview','Přehled'],['map','Mapa'],['strategy','Operace'],['events','Události']].map(([id,name])=>`<button data-view="${id}" class="${view===id?'active':''}">${name}</button>`).join('')}</nav>`;}
+function top(){
+ const warning=state.errors.length?`<div class="warning">${state.errors.length} chyb ve vstupních událostech: ${esc(state.errors[0])}</div>`:'';
+ return `<header class="top"><div><div class="eyebrow">LA LINIA</div><h1>Herní přehled</h1></div><div class="top-controls"><label for="selected-team">Pohled týmu</label><select id="selected-team">${Object.keys(state.scoring).map(t=>`<option ${t===selectedTeam?'selected':''} value="${esc(t)}">${esc(t)}</option>`).join('')}</select><span class="stamp">Poslední událost ${state.latestEvent?fmtTime(state.latestEvent):'bez událostí'}</span></div></header>${warning}`;
+}
 function card(name,num){return `<div class="card"><span class="sub">${name}</span><strong>${num}</strong></div>`;}
 function personFilter(){return `<div class="filter"><label for="players">Dostupní hráči</label><select id="players">${[3,4,5,6,7,8,9,10,12].map(n=>`<option value="${n}" ${players===n?'selected':''}>${n} hráčů</option>`).join('')}</select></div>`;}
 function targets(){return [...state.states.values()].filter(s=>s.category==='tram'&&s.owner!==MY_TEAM).map(s=>impactOf(state,s.id,data.rules)).filter(Boolean).sort((a,b)=>b.score-a.score);}
 function overview(){
- const tickets=dailyTickets(state,data.rules,now),ourTickets=tickets.teams[MY_TEAM],own=state.scoring[MY_TEAM];
+ const tickets=dailyTickets(state,data.rules,now);
  const ranking=Object.entries(state.scoring).sort((a,b)=>displayedScore(b[1],includeAreaScore)-displayedScore(a[1],includeAreaScore));
- const rank=ranking.findIndex(([name])=>name===MY_TEAM)+1;
- const topNow=targets().filter(t=>t.cost<=players).slice(0,6),risks=defenses().slice(0,5),next=opportunities().filter(o=>!o.now).slice(0,5);
- const modes='<div class="score-modes"><button data-score-mode="total" class="'+(includeAreaScore?'active':'')+'">Celkem</button><button data-score-mode="base" class="'+(!includeAreaScore?'active':'')+'">Bez území</button></div>';
- const rankingRows=ranking.map(([name,score],index)=>{
-  const t=tickets.teams[name],points=displayedScore(score,includeAreaScore);
-  return '<div class="score-row"><span class="teamline"><i class="dot" style="background:'+teamColor(name)+'"></i>'+(index+1)+'. '+esc(name)+'</span><strong>'+cap(points)+'</strong><span class="ticket-remaining" title="Zbývající jízdenky">'+cap(t.remaining)+' / '+t.limit+'</span></div>';
+ const modes=`<div class="score-modes"><button data-score-mode="total" class="${includeAreaScore?'active':''}">Celkem</button><button data-score-mode="base" class="${!includeAreaScore?'active':''}">Bez území</button></div>`;
+ const rows=ranking.map(([name,score],i)=>{
+  const ticket=tickets.teams[name],expanded=expandedScore===name;
+  const values=[['Tramvaje',score.tram],['Vlaky',score.train],['Metro',score.metro],['Území',score.area]],sum=values.reduce((n,[,v])=>n+Math.max(0,v),0);
+  const details=expanded?`<div class="score-detail"><div class="score-breakdown">${values.map(([label,value])=>`<div><span>${label}</span><b>${cap(value)}</b></div>`).join('')}</div><div class="score-bar">${values.filter(([,v])=>v>0).map(([label,v])=>`<span title="${esc(label)}: ${cap(v)}" style="width:${sum?100*v/sum:0}%;background:${({'Tramvaje':'#5ac58d','Vlaky':'#75a7e8','Metro':'#dfb268','Území':'#a97bd8'})[label]}"></span>`).join('')}</div><div class="score-legend">Tramvaje · Vlaky · Metro · Území</div></div>`:'';
+  return `<div class="score-entry"><button class="score-row score-button" data-expand-team="${esc(name)}" aria-expanded="${expanded}"><span class="teamline"><i class="dot" style="background:${teamColor(name)}"></i>${i+1}. ${esc(name)}</span><strong>${cap(displayedScore(score,includeAreaScore))}</strong><span class="ticket-remaining">${cap(ticket.remaining)} / ${ticket.limit}</span><span class="chevron">${expanded?'⌃':'⌄'}</span></button>${details}</div>`;
  }).join('');
- const expensive=Object.entries(tickets.teams).filter(([,t])=>t.spent>t.limit).map(([n])=>n);
- return '<div class="toolbar"><h2>Aktuální situace</h2>'+personFilter()+'</div>'
-  +'<div class="cards">'+card('Naše skóre',cap(displayedScore(own,includeAreaScore)))+card('Jízdenky',ourTickets.remaining+' / '+ourTickets.limit)+card('Pořadí',rank+'. / '+ranking.length)+card('Naše zastávky',[...state.states.values()].filter(s=>s.owner===MY_TEAM&&s.category==='tram').length)+'</div>'
-  +'<section class="panel score-panel"><div class="score-panel-head"><h3>Pořadí týmů</h3>'+modes+'</div><div class="score-head"><span>Tým</span><span>Body</span><span>Jízdenky</span></div>'+rankingRows+'</section>'
-  +(expensive.length?'<div class="warning">Překročen limit jízdenek v historii: '+expensive.map(esc).join(', ')+'</div>':'')
-  +'<div class="cols" style="margin-top:12px"><section class="panel"><h3>Nejlepší dostupné útoky</h3>'+(topNow.length?topNow.map(x=>targetRowSimple(x)).join(''):'<div class="empty">Žádný dostupný cíl.</div>')+'</section>'
-  +'<section class="panel"><h3>Nejbližší decay</h3>'+(next.length?next.map(o=>'<div class="row"><button data-station="'+o.station.id+'">'+esc(o.station.name)+'<br><span class="muted">'+fmtShort(o.at)+'</span></button><span>'+o.needed+' hráči</span></div>').join(''):'<div class="empty">Žádný další pokles pro tuto skupinu.</div>')+'</section></div>'
-  +'<div class="cols" style="margin-top:12px"><section class="panel"><h3>Naše ohrožené spojnice</h3>'+risks.map(x=>'<div class="row"><button data-station="'+x.station.id+'">'+esc(x.station.name)+'</button><b class="bad">−'+cap(x.loss)+'</b></div>').join('')+'</section>'
-  +'<section class="panel"><h3>Poslední obsazení</h3>'+recentCaptures(state,5).map(e=>'<div class="row"><button data-station="'+e.stationId+'"><b>'+esc(e.station)+'</b><br><span class="note">'+fmtShort(e.ms)+' · '+esc(e.team)+'</span></button><span class="note">'+e.value+' hráčů</span></div>').join('')+'</section></div>';
+ const recent=eventFeed(state).filter(x=>x.ms>=now-3600000);
+ return `<section class="panel score-panel"><div class="score-panel-head"><h2>Pořadí týmů</h2>${modes}</div><div class="score-head"><span>Tým</span><span>Body</span><span>Jízdenky</span><span></span></div>${rows}</section><section class="panel recent-panel"><div class="section-head"><h2>Posledních 60 minut</h2><button data-view="events" class="text-link">Všechny události ›</button></div>${recent.length?recent.map(eventCard).join(''):'<div class="empty">Za posledních 60 minut není zaznamenána žádná událost.</div>'}</section>`;
+}
+function eventCard(e){
+ const changes=e.impact?.changes||{},gain=changes[e.team],loss=e.previousOwner&&e.previousOwner!==e.team?changes[e.previousOwner]:null;
+ const action=e.kind==='reinforce'?'posílil':e.kind==='first'?'obsadil':'převzal';
+ const relation=e.previousOwner&&e.previousOwner!==e.team?`${esc(e.team)} převzal od ${esc(e.previousOwner)}`:`${esc(e.team)} ${action}`;
+ const deltas=e.impact?`<div class="event-deltas"><span class="good">${gain?.direct>=0?'+':''}${cap(gain?.direct||0)} přímé · ${gain?.total>=0?'+':''}${cap(gain?.total||0)} celkem</span>${loss?`<span class="bad">${cap(loss.direct||0)} přímé · ${cap(loss.total||0)} celkem</span>`:''}</div>`:`<small>Bodové změny před checkpointem nejsou přesně doložené.</small>`;
+ return `<div class="event-card"><button class="event-open" data-station="${e.stationId}"><i class="event-indicator" style="background:${teamColor(e.team)}"></i><span class="event-main"><b>${esc(e.station)}</b><small>${relation} · ${fmtShort(e.ms)}</small>${deltas}</span><span class="event-value ${e.category==='train'?'train':''}" style="background:${teamColor(e.team)}">${e.value}</span></button></div>`;
 }
 function targetRowSimple(x){return `<div class="row"><button data-station="${x.station.id}"><b>${esc(x.station.name)}</b><br><span class="muted">${esc(x.owner||'Neutrální')} · ${x.cost} jízdenek · území ${x.areaGain>=0?'+':''}${x.areaGain}</span></button><span><strong class="good">+${cap(x.gain)}</strong>${x.owner?`<br><span class="bad note">−${cap(x.enemyLoss)} soupeř</span>`:''}</span></div>`;}
 function defenses(){return [...state.states.values()].filter(s=>s.owner===MY_TEAM&&s.category==='tram').map(s=>lossOf(state,s.id,data.rules)).filter(Boolean).sort((a,b)=>b.loss-a.loss);}
