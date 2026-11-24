@@ -136,3 +136,7 @@
  .event-deltas{gap:3px 9px}
  .strategy-scores{min-width:90px}
 }
+
+/* Pět kategorií v rozbaleném rozpadu: tramvajové body v riziku, uchované, vlaky, metro, území. */
+.score-breakdown{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media(max-width:460px){.score-breakdown{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:10px}}
