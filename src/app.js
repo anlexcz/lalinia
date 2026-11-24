@@ -124,7 +124,7 @@ function initStrategicMap(){
  tiles.on('tileload',()=>{tilesLoaded=true;const warning=el.querySelector('.map-load-warning');if(warning)warning.remove();});
  tiles.on('tileerror',()=>{tilesFailed++;if(tilesFailed>=4&&!tilesLoaded&&!el.querySelector('.map-load-warning')){const warning=document.createElement('div');warning.className='map-load-warning';warning.textContent='Podklad nedostupný';el.appendChild(warning);}});
  tiles.addTo(map);
- const updateMarkerDensity=()=>{if(strategicMap===map)map.getContainer().classList.toggle('map-distant',map.getZoom()<12.5);};
+ const updateMarkerDensity=()=>{if(strategicMap===map)map.getContainer().classList.toggle('map-distant',map.getZoom()<11);};
  map.on('zoomend',updateMarkerDensity);
  map.on('moveend zoomend',()=>{if(strategicMap!==map)return;const center=map.getCenter();mapViewState={center:[center.lng,center.lat],zoom:map.getZoom(),userMoved:true};});
  // Spojnice vyjadřují pouze skutečně propojená území: obě koncové
