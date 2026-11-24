@@ -4264,5 +4264,14 @@
     "team": "Cosa Nostra",
     "value": 4,
     "author": "Ester"
+  },
+  {
+    "id": 480,
+    "datetime": "24. 11. 2026, 20:13:56",
+    "station": "Dvorce",
+    "category": "tram",
+    "team": "Cosa Nostra",
+    "value": 4,
+    "author": "Dex"
   }
 ]
