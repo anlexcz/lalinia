@@ -70,6 +70,7 @@ export function reconstruct(topology,rules,checkpoint,events,now=Date.now()){
  let areas=areaOf(owners,graph,rules).scores;
  // Replay only captures occurring after the checkpoint; older history is the source of decay epochs.
  let added=0;
+ const impactByEvent=new Map();
  for(const e of ordered){if(e.id<=checkpoint.checkpoint_event_id)continue;
    if(e.ms>now)continue;
    const station=graph.stations.get(e.stationId); const previous=base.get(e.stationId);if(!previous)continue;
@@ -77,6 +78,7 @@ export function reconstruct(topology,rules,checkpoint,events,now=Date.now()){
    const oldValue=existing?valueAt(existing,rules,e.ms):previous.value;
    const oldOwner=previous.owner;
    const multiplier=station.is_terminus?rules.terminus_multiplier:1;
+   const scoresBefore=Object.fromEntries(Object.entries(scoring).map(([name,score])=>[name,{...score}]));
    if(!scoring[e.team]){warnings.push(`Neznámý tým v události ${e.id}: ${e.team}`);continue;}
    const add=(team,part,delta)=>{scoring[team][part]+=delta;scoring[team].total+=delta;};
    if(station.category==='tram'){
@@ -92,13 +94,15 @@ export function reconstruct(topology,rules,checkpoint,events,now=Date.now()){
    const newer=areaOf(owners,graph,rules).scores;
    for(const team of Object.keys(scoring)) {const delta=(newer[team]||0)-(areas[team]||0);scoring[team].area+=delta;scoring[team].total+=delta;}
    areas=newer;latestByStation.set(e.stationId,e);added++;
+   const changes={};for(const name of Object.keys(scoring)){const before=scoresBefore[name],after=scoring[name];const direct=(after.tram-before.tram)+(after.train-before.train)+(after.metro-before.metro);const area=after.area-before.area;if(direct||area)changes[name]={direct,area,total:direct+area};}
+   impactByEvent.set(e.id,{changes,previousOwner:oldOwner,oldValue});
  }
  const states=new Map();for(const s of topology.stations){const cp=base.get(s.id),capture=latestByStation.get(s.id);const owner=cp?.owner||null;const value=capture?valueAt(capture,rules,now):cp?.value||0;
    const transitions=timeline(capture,rules);const pending=transitions.filter(x=>x.at>now);
    states.set(s.id,{...s,owner,value,capture:capture||null,transitions,pending,needed:requiredPlayers(value,owner,rules),protectedUntil:capture?capture.ms+rules.protection_minutes*60000:null});
  }
  const history=new Map();for(const e of ordered){if(!history.has(e.stationId))history.set(e.stationId,[]);history.get(e.stationId).push(e);}
- return {graph,states,scoring,history,orderedEvents:ordered,asOf:now,errors,warnings,eventsCount:ordered.length,added,checkpointId:checkpoint.checkpoint_event_id,latestEvent:ordered.length?ordered.at(-1).ms:null};
+ return {graph,states,scoring,history,orderedEvents:ordered,impactByEvent,asOf:now,errors,warnings,eventsCount:ordered.length,added,checkpointId:checkpoint.checkpoint_event_id,latestEvent:ordered.length?ordered.at(-1).ms:null};
 }
 export function impactOf(state,targetId,rules,team=MY_TEAM){
  const {states,graph}=state,station=states.get(targetId);if(!station||station.owner===team||station.category!=='tram')return null;
@@ -110,14 +114,14 @@ export function impactOf(state,targetId,rules,team=MY_TEAM){
  const enemyLoss=station.owner?station.value*mult+(before[station.owner]||0)-(after[station.owner]||0):0;
  return {station,gain,enemyLoss,cost:n,owner:station.owner,score:gain+enemyLoss,areaGain:(after[team]||0)-(before[team]||0)};
 }
-export function lossOf(state,targetId,rules){
- const station=state.states.get(targetId);if(station.owner!==MY_TEAM||station.category!=='tram')return null;
+export function lossOf(state,targetId,rules,team=MY_TEAM){
+ const station=state.states.get(targetId);if(!station||station.owner!==team||station.category!=='tram')return null;
  const owners=new Map([...state.states].map(([id,s])=>[id,s.owner]));const before=areaOf(owners,state.graph,rules).scores;
  owners.set(targetId,'__rival__');const after=areaOf(owners,state.graph,rules).scores;
- return {station,loss:station.value*(station.is_terminus?rules.terminus_multiplier:1)+(before[MY_TEAM]||0)-(after[MY_TEAM]||0),needed:station.needed};
+ return {station,loss:station.value*(station.is_terminus?rules.terminus_multiplier:1)+(before[team]||0)-(after[team]||0),needed:station.needed};
 }
-export function opportunityFor(station,rules,group,now){
- if(station.owner===MY_TEAM || station.category!=='tram')return null;
+export function opportunityFor(station,rules,group,now,team=MY_TEAM){
+ if(station.owner===team || station.category!=='tram')return null;
  const firstLegal=Math.max(now,station.protectedUntil||0);
  // An already affordable target can become available as soon as protection ends.
  if(station.needed<=group)return {at:firstLegal,needed:station.needed,now:firstLegal<=now};
@@ -189,17 +193,19 @@ export function eventFeed(state, filters={}) {
  const prior=new Map(), rows=[];
  for(const e of state.orderedEvents||[]){
   if(e.ms>state.asOf)continue;
-  const previousOwner=prior.get(e.stationId)||null;
+  const impact=state.impactByEvent?.get(e.id);
+  const previousOwner=impact?.previousOwner??prior.get(e.stationId)??null;
   const kind=!previousOwner?'first':previousOwner===e.team?'reinforce':'takeover';
-  const scope=e.team===MY_TEAM
-    ? (previousOwner===MY_TEAM?'reinforce':'gain')
-    : (previousOwner===MY_TEAM?'loss':'other');
-  rows.push({...e,previousOwner,kind,scope});
+  const subject=filters.team==='all'||!filters.team?MY_TEAM:filters.team;
+  const scope=e.team===subject?(previousOwner===subject?'reinforce':'gain'):(previousOwner===subject?'loss':'other');
+  rows.push({...e,previousOwner,kind,scope,impact:impact||null});
   prior.set(e.stationId,e.team);
  }
  return rows.reverse().filter(e=>
-  (!filters.team||filters.team==='all'||e.team===filters.team) &&
-  (!filters.kind||filters.kind==='all'||e.scope===filters.kind||filters.kind==='takeover'&&e.kind==='takeover')
+   (!filters.team||filters.team==='all'||e.team===filters.team||e.previousOwner===filters.team) &&
+   (!filters.kind||filters.kind==='all'||filters.kind==='takeover'&&e.kind==='takeover'||
+    filters.kind==='first'&&e.kind==='first'||filters.kind==='reinforce'&&e.kind==='reinforce'||
+    filters.kind==='gain'&&e.team===filters.team||filters.kind==='loss'&&e.previousOwner===filters.team&&e.team!==filters.team)
  );
 }
 
