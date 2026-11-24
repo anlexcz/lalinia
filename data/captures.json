@@ -4372,5 +4372,23 @@
     "team": "Zemunski klan",
     "value": 4,
     "author": "Někdo Záhadný"
+  },
+  {
+    "id": 492,
+    "datetime": "24. 11. 2026, 22:15:19",
+    "station": "U Libušského potoka",
+    "category": "tram",
+    "team": "Zemunski klan",
+    "value": 4,
+    "author": "Štěpán Sviták"
+  },
+  {
+    "id": 493,
+    "datetime": "24. 11. 2026, 22:19:49",
+    "station": "Poliklinika Modřany",
+    "category": "tram",
+    "team": "Zemunski klan",
+    "value": 4,
+    "author": "Štěpán Sviták"
   }
 ]
