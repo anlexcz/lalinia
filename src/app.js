@@ -1,4 +1,4 @@
-import {MY_TEAM,fmtTime,fmtShort,reconstruct,impactOf,lossOf,opportunityFor,requiredPlayers,stationHistory,findOperations,recentCaptures,eventFeed,dailyTickets,displayedScore} from './engine.js?v=20261124-train-nodecay';
+import {MY_TEAM,fmtTime,fmtShort,reconstruct,impactOf,lossOf,opportunityFor,requiredPlayers,stationHistory,findOperations,recentCaptures,eventFeed,dailyTickets,displayedScore} from './engine.js?v=20261124-full-history';
 const paths=['topology.json','rules.json','checkpoint.json','captures.json'];
 const liveCaptures='https://raw.githubusercontent.com/anlexcz/lalinia/main/data/captures.json';
 const liveSyncStatus='https://raw.githubusercontent.com/anlexcz/lalinia/main/data/sync-status.json';
