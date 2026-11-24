@@ -99,7 +99,7 @@ function mapView(){
 function initStrategicMap(){
  const el=document.getElementById('strategic-map');if(!el)return;
  if(typeof window.L==='undefined'){el.innerHTML='<div class="empty">Mapovou knihovnu se nepodařilo načíst.</div>';return;}
- const tram=[...state.states.values()].filter(s=>s.category==='tram'&&Number.isFinite(s.lat)&&Number.isFinite(s.lon));
+ const points=[...state.states.values()].filter(s=>((s.category==='tram'&&mapTram)||(s.category==='train'&&mapTrain))&&Number.isFinite(s.lat)&&Number.isFinite(s.lon));
  const map=L.map(el,{zoomControl:false,minZoom:9,maxZoom:19,preferCanvas:true,scrollWheelZoom:true});
  strategicMap=map;
  map.setView([mapViewState.center[1],mapViewState.center[0]],mapViewState.zoom,{animate:false});
@@ -113,19 +113,20 @@ function initStrategicMap(){
  tiles.on('tileerror',()=>{tilesFailed++;if(tilesFailed>=4&&!tilesLoaded&&!el.querySelector('.map-load-warning')){const warning=document.createElement('div');warning.className='map-load-warning';warning.textContent='Podklad nedostupný';el.appendChild(warning);}});
  tiles.addTo(map);
  map.on('moveend zoomend',()=>{if(strategicMap!==map)return;const center=map.getCenter();mapViewState={center:[center.lng,center.lat],zoom:map.getZoom(),userMoved:true};});
- data.topology.edges.forEach(e=>{
+ if(mapEdges)data.topology.edges.forEach(e=>{
   const coords=(e.geometry?.length?e.geometry:[[state.states.get(e.from)?.lat,state.states.get(e.from)?.lon],[state.states.get(e.to)?.lat,state.states.get(e.to)?.lon]]).filter(p=>Number.isFinite(p?.[0])&&Number.isFinite(p?.[1]));
   if(coords.length>=2)L.polyline(coords,{color:'#7b9384',weight:2,opacity:.78,interactive:false}).addTo(map);
  });
- tram.forEach(s=>{
-  const marker=L.circleMarker([s.lat,s.lon],{radius:7,fillColor:teamColor(s.owner),fillOpacity:.97,color:'#121715',weight:1.5});
-  marker.bindTooltip(esc(s.name)+' · '+esc(s.owner||'Neutrální')+' · '+s.value,{direction:'top'});
-  marker.on('click',()=>{selected=s.id;render();});
-  marker.addTo(map);
+ points.forEach(s=>{
+   const icon=L.divIcon({html:'<div class="map-point '+(s.category==='train'?'train':'')+'" style="background:'+teamColor(s.owner)+'">'+s.value+'</div>',className:'map-point-wrap',iconSize:[27,27],iconAnchor:[13,13]});
+   const marker=L.marker([s.lat,s.lon],{icon});
+   marker.bindTooltip(esc(s.name)+' · '+esc(s.owner||'Neutrální')+' · '+s.value,{direction:'top'});
+   marker.on('click',()=>{selected=s.id;render();});
+   marker.addTo(map);
  });
  if(!mapViewState.userMoved){
-  const bounds=L.latLngBounds(tram.map(s=>[s.lat,s.lon]));
-  map.fitBounds(bounds.pad(.06),{animate:false});
+  const bounds=L.latLngBounds(points.map(s=>[s.lat,s.lon]));
+  if(points.length)map.fitBounds(bounds.pad(.06),{animate:false});
   const center=map.getCenter();mapViewState={center:[center.lng,center.lat],zoom:map.getZoom(),userMoved:false};
  }
  setTimeout(()=>{if(strategicMap===map)map.invalidateSize();},40);
