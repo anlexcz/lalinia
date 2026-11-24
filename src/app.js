@@ -41,7 +41,7 @@ async function fetchSyncStatus(){
   if(!r.ok)throw new Error('GitHub API '+r.status);
   const file=await r.json();
   if(file.encoding!=='base64'||!file.content)throw new Error('Neplatný formát statusu');
-  status=JSON.parse(atob(file.content.replace(/\\s/g,'')));
+  status=JSON.parse(atob(file.content.replace(/\s/g,'')));
  }catch(err){
   console.warn('GitHub API status unavailable, using raw fallback:',err);
   try{
