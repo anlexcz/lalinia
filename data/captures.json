@@ -4237,5 +4237,32 @@
     "team": "Cosa Nostra",
     "value": 6,
     "author": "Dex"
+  },
+  {
+    "id": 477,
+    "datetime": "24. 11. 2026, 19:51:36",
+    "station": "Náměstí Olgy Scheinpflugové",
+    "category": "tram",
+    "team": "Cosa Nostra",
+    "value": 4,
+    "author": "Dex"
+  },
+  {
+    "id": 478,
+    "datetime": "24. 11. 2026, 19:53:50",
+    "station": "Arbesovo náměstí",
+    "category": "tram",
+    "team": "Yakuza",
+    "value": 4,
+    "author": "Jan Vrba"
+  },
+  {
+    "id": 479,
+    "datetime": "24. 11. 2026, 19:57:09",
+    "station": "Sídliště Barrandov",
+    "category": "tram",
+    "team": "Cosa Nostra",
+    "value": 4,
+    "author": "Ester"
   }
 ]
