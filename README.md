@@ -103,7 +103,7 @@ Test lokálně: `python -m unittest discover -s tests -p 'test_sync.py'` a `node
 
 ## Univerzální rozhraní – listopad 2026
 
-- **Přehled** je pro všechny týmy stejný. V jediném kompaktním žebříčku je tým, body a zbývající denní jízdenky. Přepínač `Celkem / Bez území` přerovnává pořadí. Po rozkliknutí řádku se zobrazí rozpad na tramvajové body v riziku, uchované tramvajové body, vlak, metro a aktuální území, s procentuálním pruhem. Uchované tramvajové body jsou **tramvajové skóre mínus současná odečitatelná hodnota vlastněných zastávek**; zahrnují tak i první bonusy a historické zisky, nejde o čisté „body za decay“.
+- **Přehled** je pro všechny týmy stejný. V jediném kompaktním žebříčku je tým, body a zbývající denní jízdenky. Přepínač `Celkem / Bez území` přerovnává pořadí. Po rozkliknutí řádku se zobrazí rozpad na tramvajové body v riziku, body Decay, vlak, metro a aktuální území, s procentuálním pruhem. Uchované tramvajové body jsou **tramvajové skóre mínus současná odečitatelná hodnota vlastněných zastávek**; zahrnují tak i první bonusy a historické zisky, nejde o čisté „body za decay“.
 - Pod žebříčkem je seznam **skutečných událostí za klouzavých 60 minut**, včetně změny přímých i celkových bodů obou týmů. Při převzetí s prokazatelným decay se zobrazuje, kolik přímých bodů původnímu týmu zůstalo. Bodové změny jsou **doložitelné až po výchozím checkpointu ID 331**; u dřívějších událostí není přesný historický rozpad tvrzen.
 - **Události**: posledních 30 položek, tlačítko přidává dalších 30, filtry dle týmu (včetně jeho ztrát), typu a hledaného názvu zastávky.
 - **Mapa**: nezávislé přepínače tramvají, vlaků a spojnic; tramvajové značky jsou kolečka, vlakové čtverce; obojí obsahuje aktuální herní hodnotu.
