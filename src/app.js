@@ -32,13 +32,26 @@ async function fetchCaptures(){
  }
 }
 async function fetchSyncStatus(){
+ // GitHub Raw CDN can lag behind the latest commit. The Contents API reads
+ // the current file from main and is used for this small status payload only.
+ let status=null;
  try{
-  const r=await fetch(liveSyncStatus+'?v='+Math.floor(Date.now()/60000),{cache:'no-store'});
-  if(!r.ok)return;
-  const status=await r.json();
-  const ms=Date.parse(status.last_success_utc||'');
-  if(Number.isFinite(ms)&&ms>0&&ms<=Date.now()+60000)lastSuccessfulSync=ms;
- }catch(err){console.warn('Čas poslední úspěšné synchronizace není dostupný:',err);}
+  const url='https://api.github.com/repos/anlexcz/lalinia/contents/data/sync-status.json?ref=main&v='+Date.now();
+  const r=await fetch(url,{cache:'no-store',headers:{Accept:'application/vnd.github+json'}});
+  if(!r.ok)throw new Error('GitHub API '+r.status);
+  const file=await r.json();
+  if(file.encoding!=='base64'||!file.content)throw new Error('Neplatný formát statusu');
+  status=JSON.parse(atob(file.content.replace(/\\s/g,'')));
+ }catch(err){
+  console.warn('GitHub API status unavailable, using raw fallback:',err);
+  try{
+   const r=await fetch(liveSyncStatus+'?v='+Date.now(),{cache:'no-store'});
+   if(r.ok)status=await r.json();
+  }catch(fallbackErr){console.warn('Čas synchronizace není dostupný:',fallbackErr);}
+ }
+ if(!status)return;
+ const ms=Date.parse(status.last_success_utc||'');
+ if(Number.isFinite(ms)&&ms>0&&ms<=Date.now()+60000&&(!lastSuccessfulSync||ms>lastSuccessfulSync))lastSuccessfulSync=ms;
 }
 function syncTimestamp(){
  if(!lastSuccessfulSync)return 'Čeká na první ověřenou synchronizaci';
@@ -231,7 +244,7 @@ app.addEventListener('input',e=>{if(e.target.id==='event-search'){eventSearch=e.
 window.addEventListener('hashchange',()=>{const next=viewFromHash();if(next!==view||selected!==null){view=next;selected=null;if(state){render();window.scrollTo(0,0);}}});
 load();
 setInterval(()=>{if(data.topology)refresh();},60000);
-setInterval(async()=>{if(!data.topology)return;await fetchSyncStatus();const el=document.getElementById('sync-stamp');if(el)el.textContent='Poslední aktualizace: '+syncTimestamp();},60000);
+setInterval(async()=>{if(!data.topology)return;await fetchSyncStatus();const el=document.getElementById('sync-stamp');if(el)el.textContent='Poslední aktualizace: '+syncTimestamp();},120000);
 setInterval(async()=>{
  if(!data.topology)return;
  try{
