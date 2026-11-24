@@ -33,8 +33,9 @@ assert.deepEqual(pair.deltas,combinations[0].deltas);
 console.log('OK: capture history, takeover classification, local combinations and full graph score deltas');
 
 const recent=parseCaptureTime('23. 11. 2026, 20:38:00');
-const full=reconstruct(topology,rules,checkpoint,events,recent);
-assert.equal(events.length,404);
+const historic=events.filter(e=>e.id<=409); // Fixed historical fixture; newer syncs can append.
+const full=reconstruct(topology,rules,checkpoint,historic,recent);
+assert.equal(historic.length,404);
 assert.equal(full.eventsCount,404);
 assert.equal(full.errors.length,0,full.errors.join(' | '));
 assert.equal(full.latestEvent,parseCaptureTime('23. 11. 2026, 20:37:37'));
@@ -67,9 +68,15 @@ assert.equal(displayedScore(full.scoring['Cosa Nostra'],true),full.scoring['Cosa
 assert.equal(full.warnings.length,0,full.warnings.join(' | '));
 // Referenční oficiální pořadí ze stránky hry po capture #417.
 const officialAt=parseCaptureTime('24. 11. 2026, 00:01:00');
-const official=reconstruct(topology,rules,checkpoint,events,officialAt);
+const official=reconstruct(topology,rules,checkpoint,events.filter(e=>e.id<=417),officialAt);
 for(const [team,points] of Object.entries({'Cosa Nostra':1112,'Los Bandidos':88,'Spiriti':545,'Yakuza':589,'Zemunski klan':680})){
  assert.equal(official.scoring[team].total,points,'Score mismatch: '+team);
 }
 console.log('OK: scores match official scoreboard after event #417');
 console.log('OK: ticket reset at 03:00, all team budgets, clean vs total score, train events');
+
+// New events may arrive automatically: don't pin the live file to an old count.
+assert.ok(events.length>=412);
+assert.equal(new Set(events.map(e=>e.id)).size,events.length);
+assert.ok(events.every((e,i)=>i===0||events[i-1].id<e.id));
+console.log('OK: append-only event log extends without invalidating fixed historic tests');
