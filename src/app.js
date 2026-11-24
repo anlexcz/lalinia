@@ -48,8 +48,10 @@ function overview(){
  const modes=`<div class="score-modes"><button data-score-mode="total" class="${includeAreaScore?'active':''}">Celkem</button><button data-score-mode="base" class="${!includeAreaScore?'active':''}">Bez území</button></div>`;
  const rows=ranking.map(([name,score],i)=>{
   const ticket=tickets.teams[name],expanded=expandedScore===name;
-  const values=[['Tramvaje',score.tram],['Vlaky',score.train],['Metro',score.metro],['Území',score.area]],sum=values.reduce((n,[,v])=>n+Math.max(0,v),0);
-  const details=expanded?`<div class="score-detail"><div class="score-breakdown">${values.map(([label,value])=>`<div><span>${label}</span><b>${cap(value)}</b></div>`).join('')}</div><div class="score-bar">${values.filter(([,v])=>v>0).map(([label,v])=>`<span title="${esc(label)}: ${cap(v)}" style="width:${sum?100*v/sum:0}%;background:${({'Tramvaje':'#5ac58d','Vlaky':'#75a7e8','Metro':'#dfb268','Území':'#a97bd8'})[label]}"></span>`).join('')}</div><div class="score-legend">Tramvaje · Vlaky · Metro · Území</div></div>`:'';
+  const atRisk=[...state.states.values()].filter(t=>t.category==='tram'&&t.owner===name).reduce((sum,t)=>sum+t.value*(t.is_terminus?data.rules.terminus_multiplier:1),0);
+  const retained=score.tram-atRisk;
+  const values=[['Tramvaje',atRisk],['Uchované',retained],['Vlaky',score.train],['Metro',score.metro],['Území',score.area]],sum=values.reduce((n,[,v])=>n+Math.max(0,v),0);
+  const details=expanded?`<div class="score-detail"><div class="score-breakdown">${values.map(([label,value])=>`<div><span>${label}</span><b>${cap(value)}</b></div>`).join('')}</div><div class="score-bar">${values.filter(([,v])=>v>0).map(([label,v])=>`<span title="${esc(label)}: ${cap(v)}" style="width:${sum?100*v/sum:0}%;background:${({'Tramvaje':'#5ac58d','Uchované':'#b4d98f','Vlaky':'#75a7e8','Metro':'#dfb268','Území':'#a97bd8'})[label]}"></span>`).join('')}</div><div class="score-legend">Tramvaje v riziku · Uchované (decay a bonusy) · Vlaky · Metro · Území</div></div>`:'';
   return `<div class="score-entry"><button class="score-row score-button" data-expand-team="${esc(name)}" aria-expanded="${expanded}"><span class="teamline"><i class="dot" style="background:${teamColor(name)}"></i>${i+1}. ${esc(name)}</span><strong>${cap(displayedScore(score,includeAreaScore))}</strong><span class="ticket-remaining">${cap(ticket.remaining)} / ${ticket.limit}</span><span class="chevron">${expanded?'⌃':'⌄'}</span></button>${details}</div>`;
  }).join('');
  const recent=eventFeed(state).filter(x=>x.ms>=now-3600000);
