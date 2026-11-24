@@ -4273,5 +4273,23 @@
     "team": "Cosa Nostra",
     "value": 4,
     "author": "Dex"
+  },
+  {
+    "id": 481,
+    "datetime": "24. 11. 2026, 20:20:49",
+    "station": "Přístaviště",
+    "category": "tram",
+    "team": "Cosa Nostra",
+    "value": 5,
+    "author": "Dex"
+  },
+  {
+    "id": 482,
+    "datetime": "24. 11. 2026, 20:25:35",
+    "station": "Pobřežní cesta",
+    "category": "tram",
+    "team": "Cosa Nostra",
+    "value": 4,
+    "author": "Anlex"
   }
 ]
