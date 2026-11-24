@@ -149,3 +149,47 @@
 /* Oddálený pohled: zachovat týmové barvy a tvar, skrýt hodnotu a zmenšit body.
    Marker má stále 27×27 px klikací plochu; samotná grafika se škáluje kolem středu. */
 .strategic-map.map-distant .map-point{transform:scale(.5);transform-origin:center center;font-size:0;line-height:0}
+
+/* Kompaktní detail zastávky; na mobilu čitelný bez nadměrných boxů. */
+.detail{padding:16px}
+.detail-top{align-items:flex-start;gap:12px;padding-bottom:13px;border-bottom:1px solid var(--stroke)}
+.detail-heading{flex:1;min-width:0}
+.detail-name-line{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:7px 0 8px}
+.detail-name-line h2{margin:0;font-size:clamp(21px,3.5vw,29px);line-height:1.18;overflow-wrap:anywhere}
+.detail-value{display:inline-flex;align-items:center;justify-content:center;flex:0 0 38px;height:38px;width:38px;border-radius:50%;border:2px solid #121715;color:#fff;font-size:18px;font-weight:800;font-variant-numeric:tabular-nums}
+.detail-value.train{border-radius:3px}
+.detail-top .teamline{color:var(--text);font-size:12px}
+#close-detail{border:1px solid #59645e;border-radius:3px;background:#343d39;color:#fff;flex:0 0 44px;width:44px;height:44px;display:grid;place-items:center;font-size:29px;line-height:1;cursor:pointer}
+#close-detail:hover,#close-detail:focus-visible{background:var(--accent);border-color:var(--accent)}
+.detail-section{padding:16px 0;border-bottom:1px solid var(--stroke)}
+.detail-section:last-child{border-bottom:0;padding-bottom:0}
+.detail-section h3{margin:0 0 10px;font-size:14px}
+.detail-facts{padding-top:7px}
+.detail-metric{display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:9px 0;border-bottom:1px solid #343c3a}
+.detail-metric:last-of-type{border-bottom:0}
+.detail-metric>span{font-size:12px;color:var(--muted)}
+.detail-metric>b{font-size:12px;text-align:right;font-variant-numeric:tabular-nums}
+.detail-caption{color:var(--muted);font-size:10px;line-height:1.55;margin:10px 0 0}
+.detail-score-table{display:flex;flex-direction:column}
+.score-table-head,.score-table-line{display:grid;grid-template-columns:minmax(0,1fr) minmax(80px,1fr) minmax(80px,1fr);gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid var(--stroke)}
+.score-table-head{color:var(--muted);font-size:10px;line-height:1.4}
+.score-table-head span:not(:first-child){text-align:right;overflow-wrap:anywhere}
+.score-table-line{font-size:12px}
+.score-table-line b{text-align:right;font-size:12px;font-variant-numeric:tabular-nums}
+.score-table-line.strong{border-bottom:0;font-weight:700}
+.decay-list{display:flex;flex-direction:column}
+.decay-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--stroke)}
+.decay-item:last-child{border-bottom:0}
+.decay-values{flex:0 0 68px;background:var(--surface2);padding:8px 5px;text-align:center;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.decay-meta{display:flex;flex-direction:column;gap:3px;min-width:0}
+.decay-meta b{font-size:12px;font-variant-numeric:tabular-nums}
+.decay-meta small{font-size:10px;color:var(--muted)}
+.compact-empty{padding:8px 0;text-align:left}
+.detail-count{color:var(--muted);font-weight:500}
+.detail .history-row{align-items:flex-start;padding:10px 0}
+.detail .history-row:last-child{border-bottom:0}
+.detail .history-marker{width:9px;height:9px;flex:none;border-radius:50%;margin-top:4px}
+.detail .history-content{display:flex;flex-direction:column;gap:5px;min-width:0}
+.detail .history-content b{font-size:12px}
+.detail .history-team{display:flex;align-items:center;gap:6px;font-size:11px}
+@media(max-width:500px){.detail{padding:13px}.detail-name-line{gap:9px}.detail-value{width:35px;height:35px;flex-basis:35px;font-size:17px}.score-table-head,.score-table-line{grid-template-columns:minmax(0,.85fr) minmax(0,1fr) minmax(0,1fr);gap:6px}.score-table-line{font-size:11px}.score-table-line b{font-size:12px}.detail-metric>span{font-size:11px}}
