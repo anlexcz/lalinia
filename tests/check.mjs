@@ -52,6 +52,34 @@ const spiritiEvents=eventFeed(full,{team:'Spiriti'});
 assert.ok(spiritiEvents.length>0);
 assert.ok(spiritiEvents.every(e=>e.team==='Spiriti'||e.previousOwner==='Spiriti'),'Team filter must include captures and losses');
 assert.ok(spiritiEvents.some(e=>e.team!=='Spiriti'&&e.previousOwner==='Spiriti'),'Team filter must include losses');
+// Reconstruct all pre-checkpoint event impacts from the complete capture history.
+// Their sum must equal every official checkpoint score, including area bonuses.
+const historicalFeed=eventFeed(full).filter(e=>e.id<=checkpoint.checkpoint_event_id);
+assert.equal(historicalFeed.length,baseline.length);
+assert.ok(historicalFeed.every(e=>e.impact&&e.impact.source==='historical-replay'));
+const historicalTotals=Object.fromEntries(checkpoint.teams.map(t=>[t.name,{direct:0,area:0,total:0}]));
+for(const event of historicalFeed){
+ for(const [name,change] of Object.entries(event.impact.changes)){
+  historicalTotals[name].direct+=change.direct;
+  historicalTotals[name].area+=change.area;
+  historicalTotals[name].total+=change.total;
+ }
+}
+for(const team of checkpoint.teams){
+ assert.equal(historicalTotals[team.name].direct,team.tram_score+team.train_score+team.metro_score,team.name+' historical direct points');
+ assert.equal(historicalTotals[team.name].area,team.area_score,team.name+' historical area points');
+ assert.equal(historicalTotals[team.name].total,team.total_score,team.name+' historical total points');
+}
+const hostivar=historicalFeed.find(e=>e.id===326);
+assert.equal(hostivar.station,'Nádraží Hostivař');
+assert.equal(hostivar.impact.changes.Yakuza.total,13);
+assert.equal(hostivar.impact.changes['Cosa Nostra'].total,-6);
+const satalice=historicalFeed.find(e=>e.id===153);
+assert.equal(satalice.impact.changes['Cosa Nostra'].total,6);
+assert.equal(satalice.impact.changes.Yakuza.total,-4);
+assert.equal(satalice.impact.retainedOnTakeover,0);
+console.log('OK: full historical event score deltas reconstruct every official checkpoint team score');
+
 console.log('OK: official 404-event history, team and gains/losses filters');
 
 const daily=dailyTickets(full,rules,recent);
