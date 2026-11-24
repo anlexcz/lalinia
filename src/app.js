@@ -44,24 +44,24 @@ function personFilter(){return `<div class="filter"><label for="players">Dostupn
 function targets(){return [...state.states.values()].filter(t=>t.category==='tram'&&t.owner!==selectedTeam).map(t=>impactOf(state,t.id,data.rules,selectedTeam)).filter(Boolean).filter(t=>opponent==='all'||t.owner===opponent).sort((a,b)=>b.score-a.score)}
 function overview(){
  const tickets=dailyTickets(state,data.rules,now);
- // DK = tramvajové body, které již nejsou odečitatelné přes aktuální hodnoty vlastněných zastávek.
- const dkPoints=name=>{
+ // Decay view = tramvajové body, které již nejsou odečitatelné přes aktuální hodnoty vlastněných zastávek.
+ const decayPoints=name=>{
   const score=state.scoring[name];
   const atRisk=[...state.states.values()].filter(t=>t.category==='tram'&&t.owner===name).reduce((sum,t)=>sum+t.value*(t.is_terminus?data.rules.terminus_multiplier:1),0);
   return score.tram-atRisk;
  };
  const ranking=Object.entries(state.scoring).sort((a,b)=>{
-  const points=([name,score])=>scoreMode==='dk'?dkPoints(name):displayedScore(score,scoreMode==='total');
+  const points=([name,score])=>scoreMode==='decay'?decayPoints(name):displayedScore(score,scoreMode==='total');
   return points([b[0],b[1]])-points([a[0],a[1]])||a[0].localeCompare(b[0],'cs');
  });
- const modes=`<div class="score-modes"><button data-score-mode="total" class="${scoreMode==='total'?'active':''}">Celkem</button><button data-score-mode="base" class="${scoreMode==='base'?'active':''}">Bez území</button><button data-score-mode="dk" class="${scoreMode==='dk'?'active':''}">DK</button></div>`;
+ const modes=`<div class="score-modes"><button data-score-mode="total" class="${scoreMode==='total'?'active':''}">Celkem</button><button data-score-mode="base" class="${scoreMode==='base'?'active':''}">Bez území</button><button data-score-mode="decay" class="${scoreMode==='decay'?'active':''}">Decay</button></div>`;
  const rows=ranking.map(([name,score],i)=>{
   const ticket=tickets.teams[name],expanded=expandedScore===name;
   const atRisk=[...state.states.values()].filter(t=>t.category==='tram'&&t.owner===name).reduce((sum,t)=>sum+t.value*(t.is_terminus?data.rules.terminus_multiplier:1),0);
-  const retained=dkPoints(name);
-  const values=[['Tramvaje',atRisk],['DK',retained],['Vlaky',score.train],['Metro',score.metro],['Území',score.area]],sum=values.reduce((n,[,v])=>n+Math.max(0,v),0);
-  const details=expanded?`<div class="score-detail"><div class="score-breakdown">${values.map(([label,value])=>`<div><span>${label}</span><b>${cap(value)}</b></div>`).join('')}</div><div class="score-bar">${values.filter(([,v])=>v>0).map(([label,v])=>`<span title="${esc(label)}: ${cap(v)}" style="width:${sum?100*v/sum:0}%;background:${({'Tramvaje':'#5ac58d','DK':'#b4d98f','Vlaky':'#75a7e8','Metro':'#dfb268','Území':'#a97bd8'})[label]}"></span>`).join('')}</div><div class="score-legend">Tramvaje v riziku · DK · Vlaky · Metro · Území</div></div>`:'';
-  return `<div class="score-entry"><button class="score-row score-button" data-expand-team="${esc(name)}" aria-expanded="${expanded}"><span class="teamline"><i class="dot" style="background:${teamColor(name)}"></i>${i+1}. ${esc(name)}</span><strong>${cap(scoreMode==='dk'?retained:displayedScore(score,scoreMode==='total'))}</strong><span class="ticket-remaining">${cap(ticket.remaining)} / ${ticket.limit}</span><span class="chevron">${expanded?'⌃':'⌄'}</span></button>${details}</div>`;
+  const retained=decayPoints(name);
+  const values=[['Tramvaje',atRisk],['Decay',retained],['Vlaky',score.train],['Metro',score.metro],['Území',score.area]],sum=values.reduce((n,[,v])=>n+Math.max(0,v),0);
+  const details=expanded?`<div class="score-detail"><div class="score-breakdown">${values.map(([label,value])=>`<div><span>${label}</span><b>${cap(value)}</b></div>`).join('')}</div><div class="score-bar">${values.filter(([,v])=>v>0).map(([label,v])=>`<span title="${esc(label)}: ${cap(v)}" style="width:${sum?100*v/sum:0}%;background:${({'Tramvaje':'#5ac58d','Decay':'#b4d98f','Vlaky':'#75a7e8','Metro':'#dfb268','Území':'#a97bd8'})[label]}"></span>`).join('')}</div><div class="score-legend">Tramvaje v riziku · Decay · Vlaky · Metro · Území</div></div>`:'';
+  return `<div class="score-entry"><button class="score-row score-button" data-expand-team="${esc(name)}" aria-expanded="${expanded}"><span class="teamline"><i class="dot" style="background:${teamColor(name)}"></i>${i+1}. ${esc(name)}</span><strong>${cap(scoreMode==='decay'?retained:displayedScore(score,scoreMode==='total'))}</strong><span class="ticket-remaining">${cap(ticket.remaining)} / ${ticket.limit}</span><span class="chevron">${expanded?'⌃':'⌄'}</span></button>${details}</div>`;
  }).join('');
  const recent=eventFeed(state).filter(x=>x.ms>=now-3600000);
  return `<section class="panel score-panel"><div class="score-panel-head"><h2>Pořadí týmů</h2>${modes}</div><div class="score-head"><span>Tým</span><span>Body</span><span>Jízdenky</span><span></span></div>${rows}</section><section class="panel recent-panel"><div class="section-head"><h2>Posledních 60 minut</h2><button data-view="events" class="text-link">Všechny události ›</button></div>${recent.length?recent.map(eventCard).join(''):'<div class="empty">Za posledních 60 minut není zaznamenána žádná událost.</div>'}</section>`;
