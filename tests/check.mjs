@@ -48,7 +48,10 @@ assert.ok(gains.length>90);
 assert.ok(losses.length>0);
 assert.ok(gains.every(e=>e.team==='Cosa Nostra'));
 assert.ok(losses.every(e=>e.previousOwner==='Cosa Nostra'&&e.team!=='Cosa Nostra'));
-assert.ok(eventFeed(full,{team:'Spiriti'}).every(e=>e.team==='Spiriti'));
+const spiritiEvents=eventFeed(full,{team:'Spiriti'});
+assert.ok(spiritiEvents.length>0);
+assert.ok(spiritiEvents.every(e=>e.team==='Spiriti'||e.previousOwner==='Spiriti'),'Team filter must include captures and losses');
+assert.ok(spiritiEvents.some(e=>e.team!=='Spiriti'&&e.previousOwner==='Spiriti'),'Team filter must include losses');
 console.log('OK: official 404-event history, team and gains/losses filters');
 
 const daily=dailyTickets(full,rules,recent);
