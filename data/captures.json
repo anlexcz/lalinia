@@ -4291,5 +4291,14 @@
     "team": "Cosa Nostra",
     "value": 4,
     "author": "Anlex"
+  },
+  {
+    "id": 483,
+    "datetime": "24. 11. 2026, 20:35:24",
+    "station": "Nádraží Braník",
+    "category": "tram",
+    "team": "Cosa Nostra",
+    "value": 7,
+    "author": "Dex"
   }
 ]
