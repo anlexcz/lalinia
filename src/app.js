@@ -159,18 +159,37 @@ function initStrategicMap(){
 }
 function stationDetail(id){
  const s=state.states.get(id);if(!s)return '';
- const impact=impactOf(state,id,data.rules,selectedTeam),risk=lossOf(state,id,data.rules,selectedTeam);
+ const own=s.owner===selectedTeam;
+ const mult=s.is_terminus?data.rules.terminus_multiplier:1;
+ const impact=s.category==='tram'&&!own?impactOf(state,id,data.rules,selectedTeam):null;
+ const risk=s.category==='tram'&&own?lossOf(state,id,data.rules,selectedTeam):null;
  const history=stationHistory(state,id);
- const historyHtml=history.length?history.map(e=>`<div class="history-row"><div class="history-marker" style="background:${teamColor(e.team)}"></div><div><b>${fmtTime(e.ms)}</b><div class="teamline"><i class="dot" style="background:${teamColor(e.team)}"></i>${esc(e.team)} · ${e.value} hráčů</div><div class="note">${e.kind==='first'?'První obsazení':e.kind==='reinforce'?'Posílení / opětovné obsazení':'Převzetí od '+esc(e.previousOwner)}${e.author?' · '+esc(e.author):''} · ID ${e.id}</div></div></div>`).join(''):'<div class="empty">Zatím žádné doložené obsazení.</div>';
- const currentProtection=s.protectedUntil&&s.protectedUntil>now;
- const decay=s.capture&&s.transitions.length?`<div class="timeline">${s.transitions.map(t=>`<div class="tick" style="opacity:${t.at<=now?.45:1}"><b>${fmtTime(t.at)}</b><small>${t.at<=now?'Proběhlý výpočet':'Předpověď'} · ${t.from} → ${t.to} · k převzetí stačí ${requiredPlayers(t.to,s.owner,data.rules)} hráčů</small></div>`).join('')}</div>`:'<div class="empty">Bez známých budoucích poklesů.</div>';
- return `<section class="panel detail"><div class="detail-top"><div><div class="eyebrow">DETAIL ZASTÁVKY</div><h2>${esc(s.name)}</h2><span class="teamline"><i class="dot" style="background:${teamColor(s.owner)}"></i>${esc(s.owner||'Neutrální')}${s.is_terminus?' · konečná':''}</span></div><button class="pill" id="close-detail">Zavřít ×</button></div>
- <div class="cards" style="grid-template-columns:repeat(2,1fr);margin-top:20px">${card('Aktuální hodnota',s.value)}${card('Potřeba hráčů na převzetí',s.needed)}</div>
- ${s.capture?`<div class="metric"><span>Poslední obsazení</span><b>${fmtTime(s.capture.ms)}</b></div><div class="metric"><span>Poslední skupina</span><b>${s.capture.value} hráčů</b></div><div class="metric"><span>Ochrana</span><b class="${currentProtection?'bad':''}">${currentProtection?'Do '+fmtTime(s.protectedUntil):'Ukončena'}</b></div>`:'<p class="note">V historii není obsazení této zastávky.</p>'}
- ${impact?`<div class="metric"><span>Samostatný útok</span><b class="good">+${cap(impact.gain)} nám · ${impact.owner?'−'+cap(impact.enemyLoss)+' soupeři':'neutrální'}</b></div>`:''}${risk?`<div class="metric"><span>Ztráta při převzetí</span><b class="bad">−${cap(risk.loss)} bodů</b></div>`:''}
- <h3 style="margin-top:25px">Časová osa hodnoty</h3>${decay}
- <h3 style="margin-top:25px">Historie obsazení (${history.length})</h3><div class="history-list">${historyHtml}</div>
- <div class="metric"><span>Herní sousedé</span><span class="neighbors">${(s.neighbors||[]).map(n=>`<button class="pill" data-station="${n}">${esc(state.states.get(n)?.name||n)}</button>`).join('')||'Žádní'}</span></div></section>`;
+ const historyHtml=history.length?history.map(e=>`<div class="history-row"><span class="history-marker" style="background:${teamColor(e.team)}"></span><div class="history-content"><b>${fmtTime(e.ms)}</b><span class="history-team"><i class="dot" style="background:${teamColor(e.team)}"></i>${esc(e.team)} · ${e.value} hráčů</span><span class="note">${e.kind==='first'?'První obsazení':e.kind==='reinforce'?'Posílení':'Převzetí od '+esc(e.previousOwner)}${e.author?' · '+esc(e.author):''}</span></div></div>`).join(''):'<div class="empty">Zatím žádné doložené obsazení.</div>';
+ const currentProtection=Boolean(s.protectedUntil&&s.protectedUntil>now);
+ const future=s.pending||[];
+ const decay=future.length?`<div class="decay-list">${future.map(t=>`<div class="decay-item"><span class="decay-values">${t.from} → ${t.to}</span><span class="decay-meta"><b>${fmtTime(t.at)}</b><small>K převzetí ${requiredPlayers(t.to,s.owner,data.rules)} hráči</small></span></div>`).join('')}</div><p class="detail-caption">Předpověď podle modelu hry; serverové časy decay nejsou nezávisle ověřené.</p>`:'<div class="empty compact-empty">Žádné další poklesy hodnoty.</div>';
+ const metric=(title,value,extra='')=>`<div class="detail-metric"><span>${title}</span><b class="${extra}">${value}</b></div>`;
+ const number=n=>`${n>0?'+':n<0?'−':''}${cap(Math.abs(n))}`;
+ let scoreHtml='';
+ if(impact){
+  const directGain=impact.cost*mult+(s.owner?0:data.rules.first_capture_bonus);
+  const directLoss=s.owner?s.value*mult:0;
+  scoreHtml=`<div class="detail-section"><h3>Možný útok</h3><div class="detail-score-table"><div class="score-table-head"><span></span><span>${esc(selectedTeam)}</span><span>${s.owner?esc(s.owner):'Neutrální'}</span></div><div class="score-table-line"><span>Přímé body</span><b class="good">${number(directGain)}</b><b class="bad">${s.owner?number(-directLoss):'—'}</b></div><div class="score-table-line strong"><span>Celkem s územím</span><b class="good">${number(impact.gain)}</b><b class="bad">${s.owner?number(-impact.enemyLoss):'—'}</b></div></div></div>`;
+ }else if(risk){
+  const directLoss=s.value*mult;
+  const kept=s.capture?Math.max(0,(s.capture.value-s.value)*mult):0;
+  scoreHtml=`<div class="detail-section"><h3>Možná ztráta</h3>${metric('Přímé body',number(-directLoss),'bad')}${metric('Celkem s územím',number(-risk.loss),'bad')}${kept?metric('Zůstane díky decay',number(kept),'good'):''}<p class="detail-caption">Zisk případného útočníka nelze bez jeho týmu určit.</p></div>`;
+ }else if(s.category==='train'){
+  scoreHtml='<div class="detail-section"><h3>Vlakový event</h3><p class="detail-caption">Územní ani tramvajový model útoku se na tento event nepoužívá.</p></div>';
+ }
+ return `<section class="panel detail"><div class="detail-top"><div class="detail-heading"><div class="eyebrow">DETAIL ZASTÁVKY</div><div class="detail-name-line"><h2>${esc(s.name)}</h2><span class="detail-value ${s.category==='train'?'train':''}" style="background:${teamColor(s.owner)}">${s.value}</span></div><span class="teamline"><i class="dot" style="background:${teamColor(s.owner)}"></i>${esc(s.owner||'Neutrální')}${s.is_terminus?' · konečná':''}</span></div><button id="close-detail" aria-label="Zavřít detail zastávky" title="Zavřít detail" type="button">×</button></div>
+ <div class="detail-section detail-facts">
+ ${metric('K převzetí',s.needed+' hráči')}
+ ${s.capture?metric('Poslední obsazení',fmtTime(s.capture.ms))+metric('Poslední skupina',s.capture.value+' hráči')+metric('Ochrana',currentProtection?'Do '+fmtTime(s.protectedUntil):'Ukončena',currentProtection?'bad':''):'<p class="note">Zatím bez zaznamenaného obsazení.</p>'}
+ </div>
+ ${scoreHtml}
+ <div class="detail-section"><h3>Budoucí decay</h3>${decay}</div>
+ <div class="detail-section"><h3>Historie obsazení <span class="detail-count">(${history.length})</span></h3><div class="history-list">${historyHtml}</div></div></section>`;
 }
 
 function render(){if(strategicMap){const m=strategicMap;strategicMap=null;m.remove();}const body=view==='overview'?overview():view==='map'?mapView():view==='strategy'?strategyView():view==='events'?eventsView():overview();app.innerHTML=`<div class="app">${top()}${nav()}${selected!==null?stationDetail(selected):body}</div>`; if(view==='map'&&selected===null) initStrategicMap();}
