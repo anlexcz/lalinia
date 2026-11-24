@@ -7,7 +7,7 @@ Statická mobilní webová aplikace pro GitHub Pages. Obsahuje herní síť, př
 - `data/topology.json`: 398 stanovišť (z toho 292 tramvajových), 328 herních spojnic. **Neměnit při aktualizaci obsazení.**
 - `data/rules.json`: tabulky územních bonusů a decay, minimum hráčů, konečné.
 - `data/checkpoint.json`: výchozí snapshot vlastníků a skóre, navázaný na historii do události ID 331. Není potřeba jej aktualizovat při nových obsazeních.
-- **`data/captures.json`: jediný soubor pro běžnou ruční aktualizaci.** Aktuálně 404 ověřených záznamů z oficiálního exportu (ID 2–409, 21.–23. 11. 2026 do 20:37:37). Při novém úplném exportu lze celý soubor bezpečně nahradit; u průběžných ručních dodatků přidávejte události podle originálního ID.
+- **`data/captures.json`: jediný soubor pro běžnou ruční aktualizaci.** Aktuálně nejméně 412 doložených záznamů (poslední ručně vložená událost ID 417); automatická synchronizace může historii rozšířit. Při novém úplném exportu lze celý soubor bezpečně nahradit; u průběžných ručních dodatků přidávejte události podle originálního ID.
 
 ### Jak ručně přidat obsazení
 
@@ -15,7 +15,7 @@ Na konec pole v `data/captures.json` vložte nový objekt s novým jednoznačný
 
 ```json
 {
-  "id": 410,
+  "id": 418,
   "datetime": "23. 11. 2026, 18:42:00",
   "station": "Prašný most",
   "category": "tram",
@@ -25,9 +25,9 @@ Na konec pole v `data/captures.json` vložte nový objekt s novým jednoznačný
 }
 ```
 
-Uvedený objekt je **jen ukázka formátu, ne skutečné obsazení**. Dodržte český čas `Europe/Prague`, jména týmů a názvy zastávek přesně podle vstupních souborů. Přidávat lze více záznamů najednou; web je chronologicky seřadí. Nová událost musí mít unikátní originální ID (po tomto exportu zpravidla `> 409`). Záznamy do ID 331 ukotvuje výchozí checkpoint. Novější události z něj aplikace přehrává. Při chybné události ji opravte nebo smažte před publikací.
+Uvedený objekt je **jen ukázka formátu, ne skutečné obsazení**. Dodržte český čas `Europe/Prague`, jména týmů a názvy zastávek přesně podle vstupních souborů. Přidávat lze více záznamů najednou; web je chronologicky seřadí. Nová událost musí mít unikátní originální ID (po posledním ručním importu zpravidla `> 417`). Záznamy do ID 331 ukotvuje výchozí checkpoint. Novější události z něj aplikace přehrává. Při chybné události ji opravte nebo smažte před publikací.
 
-Úložiště GitHub Pages se po commitu automaticky aktualizuje, pokud je v nastavení repozitáře povolen deploy z větve `main` (kořen `/`). Web načítá data bez cache při otevření a každou minutu přepočítává decay. **Přidání události vyžaduje obnovení stránky.**
+Úložiště GitHub Pages se po commitu automaticky aktualizuje, pokud je v nastavení repozitáře povolen deploy z větve `main` (kořen `/`). Web načítá data bez cache při otevření a každou minutu přepočítává decay. Web načítá aktualizovanou historii přímo z veřejného raw souboru větve `main` a kontroluje ji každé dvě minuty; data z GitHub Pages jsou záložní variantou. Kvůli cache GitHubu může být zobrazení o několik minut opožděné.
 
 ## Přehled bodů a jízdenek
 
@@ -69,10 +69,33 @@ Otevřete `http://localhost:8000`. Aplikace nevyžaduje balíčky ani sestavení
 - **Obrana**: očekávaná bodová ztráta včetně zničeného územního bonusu.
 - **Decay**: budoucí čas, kdy bude stačit zvolený počet hráčů.
 
-Neaktivujte automatické zapisování capture z webu; jediným rutinně upravovaným souborem zůstává `data/captures.json`.
+Jediným průběžně aktualizovaným souborem zůstává `data/captures.json`. Automatika zapisuje pouze nové originální události.
 
 ## Publikace
 
 Nahrajte všechny soubory archivu do kořene repozitáře `anlexcz/lalinia`, nikoliv celý archiv jako jeden soubor. V GitHub Pages nastavte `Deploy from a branch` → `main` → `/ (root)`.
 
 Kontrolní testy: `node tests/check.mjs`.
+
+
+## Synchronizace galerie každých 10 minut
+
+Workflow: [Synchronizace galerie La Linia](.github/workflows/sync-captures.yml). Spouští se pomocí `cron: '*/10 * * * *'` nebo ručně v GitHub Actions; interval je požadovaný, ale start běhů **GitHub negarantuje na minutu přesně**.
+
+### Jednorázové nastavení na mobilu
+
+1. Otevřete repozitář `anlexcz/lalinia` na GitHubu, případně přepněte prohlížeč do desktopového zobrazení.
+2. Jděte na **Settings → Secrets and variables → Actions → New repository secret**.
+3. Vytvořte dva Secrets: `LA_LINIA_EMAIL` a `LA_LINIA_PASSWORD` s údaji herního účtu, který má právo číst galerii. Přístupové údaje nikam necommitujte a neposílejte do chatu.
+4. V **Settings → Actions → General → Workflow permissions** vyberte **Read and write permissions** pro `GITHUB_TOKEN` (pokud je tato volba dostupná).
+5. V **Actions → Synchronizace galerie La Linia → Run workflow** spusťte zkušební běh a podívejte se do logu.
+
+Bez Secrets běh **nepřistupuje k galerii a nic nezapisuje**. Přihlášení přes běžný e-mailový formulář a čtení atributu `data-captures-url` se bez skutečného účtu nedalo ověřit, takže první běh může odhalit nutnost úpravy adaptéru. Přihlášení Google OAuth zatím podporováno není.
+
+Synchronizační skript: `scripts/sync_captures.py`. Kontroluje originální ID, shodnost již uložených událostí, návaznost historie, existenci zastávek a týmů, unikátnost ID i stránkování. Při konfliktu nebo chybě nesmí přepsat původní data. Přidání nových ID vytvoří jeden commit, bez novinek se commit nevytvoří. Souběžné běhy jsou serializované pomocí GitHub Actions `concurrency`.
+
+**Důležité pro GitHub Pages:** commit vytvořený přes `GITHUB_TOKEN` automaticky nespustí Pages build. Proto web místo čekání na nové Pages nasazení načítá `captures.json` přímo ze zveřejněné větve `main` přes raw.githubusercontent.com, s lokální zálohou a dvouminutovým kontrolním intervalem.
+
+Skript po **5. 12. 2026 03:00 Europe/Prague** přestane galerii kontaktovat. Pak lze workflow vypnout v GitHub Actions. Automatizovaný přístup by měl být v souladu s pravidly a souhlasem provozovatele Podsvětí.
+
+Test lokálně: `python -m unittest discover -s tests -p 'test_sync.py'` a `node tests/check.mjs`.
