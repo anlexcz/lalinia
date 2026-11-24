@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {reconstruct, eventFeed, impactOf, lossOf, parseCaptureTime, displayedScore} from '../src/engine.js';
+const read=name=>JSON.parse(fs.readFileSync(new URL('../data/'+name+'.json',import.meta.url)));
+const top=read('topology'),rules=read('rules'),checkpoint=read('checkpoint');
+const events=read('captures').filter(e=>e.id<=428);
+const now=parseCaptureTime('24. 11. 2026, 08:10:00');
+const state=reconstruct(top,rules,checkpoint,events,now);
+assert.deepEqual(state.errors,[]);
+assert.equal(Object.keys(state.scoring).length,5);
+const last=eventFeed(state)[0];
+assert.equal(last.id,428);
+assert.equal(last.team,'Los Bandidos');
+assert.equal(last.previousOwner,'Spiriti');
+assert.equal(last.impact.changes['Los Bandidos'].direct,4);
+assert.equal(last.impact.changes['Los Bandidos'].total,7);
+assert.equal(last.impact.changes['Spiriti'].direct,-3);
+assert.equal(last.impact.changes['Spiriti'].total,-19);
+assert.ok(last.impact.retainedOnTakeover>=0);
+assert.ok(eventFeed(state,{team:'Spiriti'}).some(e=>e.id===428),'team filter must include losses');
+assert.ok(eventFeed(state,{team:'Los Bandidos'}).some(e=>e.id===428),'team filter must include gains');
+assert.ok(eventFeed(state,{kind:'takeover'}).every(e=>e.kind==='takeover'));
+for(const [team,score] of Object.entries(state.scoring)){
+ assert.equal(displayedScore(score,true)-displayedScore(score,false),score.area);
+ const atRisk=[...state.states.values()].filter(s=>s.category==='tram'&&s.owner===team).reduce((n,s)=>n+s.value*(s.is_terminus?rules.terminus_multiplier:1),0);
+ assert.equal(atRisk+(score.tram-atRisk)+score.train+score.metro+score.area,score.total);
+ const enemy=[...state.states.values()].find(s=>s.category==='tram'&&s.owner!==team&&s.needed<=5);
+ if(enemy)assert.ok(impactOf(state,enemy.id,rules,team));
+ const own=[...state.states.values()].find(s=>s.category==='tram'&&s.owner===team);
+ if(own)assert.ok(lossOf(state,own.id,rules,team));
+}
+console.log('OK: universal team scores, decay retention, event changes, event filters and team-based operations');
