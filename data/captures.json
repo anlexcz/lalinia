@@ -3886,5 +3886,23 @@
     "team": "Yakuza",
     "value": 4,
     "author": "Keegi"
+  },
+  {
+    "id": 438,
+    "datetime": "24. 11. 2026, 17:21:37",
+    "station": "Dlabačov",
+    "category": "tram",
+    "team": "Yakuza",
+    "value": 4,
+    "author": "Keegi"
+  },
+  {
+    "id": 439,
+    "datetime": "24. 11. 2026, 17:29:52",
+    "station": "Brusnice",
+    "category": "tram",
+    "team": "Yakuza",
+    "value": 4,
+    "author": "Keegi"
   }
 ]
