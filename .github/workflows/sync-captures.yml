@@ -1,0 +1,50 @@
+name: Synchronizace galerie La Linia
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: la-linia-captures-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Dependencies
+        run: python -m pip install --disable-pip-version-check 'requests>=2.32,<3' 'beautifulsoup4>=4.12,<5'
+      - name: Check sync merge safeguards
+        run: python -m unittest discover -s tests -p 'test_sync.py'
+      - name: Download and merge captures
+        env:
+          LA_LINIA_EMAIL: ${{ secrets.LA_LINIA_EMAIL }}
+          LA_LINIA_PASSWORD: ${{ secrets.LA_LINIA_PASSWORD }}
+        run: python scripts/sync_captures.py
+      - name: Validate application data
+        run: node tests/check.mjs
+      - name: Commit only when there are new events
+        run: |
+          if git diff --quiet -- data/captures.json; then
+            echo 'No new events; no commit needed.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/captures.json
+          git commit -m 'Auto-sync La Linia capture events'
+          git push origin HEAD:main
