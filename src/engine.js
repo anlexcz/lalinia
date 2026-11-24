@@ -205,7 +205,7 @@ export function eventFeed(state, filters={}) {
    (!filters.team||filters.team==='all'||e.team===filters.team||e.previousOwner===filters.team) &&
    (!filters.kind||filters.kind==='all'||filters.kind==='takeover'&&e.kind==='takeover'||
     filters.kind==='first'&&e.kind==='first'||filters.kind==='reinforce'&&e.kind==='reinforce'||
-    filters.kind==='gain'&&e.team===filters.team||filters.kind==='loss'&&e.previousOwner===filters.team&&e.team!==filters.team)
+    filters.kind==='gain'&&e.team===(filters.team&&filters.team!=='all'?filters.team:MY_TEAM)||filters.kind==='loss'&&e.previousOwner===(filters.team&&filters.team!=='all'?filters.team:MY_TEAM)&&e.team!==(filters.team&&filters.team!=='all'?filters.team:MY_TEAM))
  );
 }
 
