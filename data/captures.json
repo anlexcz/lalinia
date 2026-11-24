@@ -4462,5 +4462,14 @@
     "team": "Zemunski klan",
     "value": 5,
     "author": "Štěpán Sviták"
+  },
+  {
+    "id": 502,
+    "datetime": "24. 11. 2026, 23:17:53",
+    "station": "Zlíchov",
+    "category": "tram",
+    "team": "Zemunski klan",
+    "value": 5,
+    "author": "Štěpán Sviták"
   }
 ]
