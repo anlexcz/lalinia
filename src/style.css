@@ -140,3 +140,8 @@
 /* Pět kategorií v rozbaleném rozpadu: tramvajové body v riziku, uchované, vlaky, metro, území. */
 .score-breakdown{grid-template-columns:repeat(5,minmax(0,1fr))}
 @media(max-width:460px){.score-breakdown{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:10px}}
+
+/* Tři kompaktní režimy žebříčku: Celkem / Bez území / DK. */
+.score-panel-head{flex-wrap:wrap}
+.score-modes{flex:0 1 auto}
+@media(max-width:480px){.score-panel-head{gap:7px}.score-modes button{padding:7px 8px;font-size:10px}}
