@@ -231,3 +231,9 @@
  .operation-search-filter{flex-basis:100%}
  .strategy-row .strategy-scores>b{font-size:13px}
 }
+
+/* Navigace jsou skutečné odkazy na samostatné hash stránky (fungují na GitHub Pages). */
+.nav a{display:block;border:0;border-bottom:2px solid transparent;padding:11px 16px;background:none;color:var(--muted);font-weight:600;white-space:nowrap;text-decoration:none;text-align:center}
+.nav a.active{border-color:var(--accent);color:var(--text)}
+.nav a:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+@media(max-width:800px){.nav a{font-size:11px;letter-spacing:0}}
