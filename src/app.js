@@ -1,5 +1,6 @@
 import {MY_TEAM,fmtTime,fmtShort,reconstruct,impactOf,lossOf,opportunityFor,requiredPlayers,stationHistory,findOperations,recentCaptures,eventFeed,dailyTickets,displayedScore} from './engine.js';
 const paths=['topology.json','rules.json','checkpoint.json','captures.json'];
+const liveCaptures='https://raw.githubusercontent.com/anlexcz/lalinia/main/data/captures.json';
 const app=document.querySelector('#app');
 let data={},state,view='overview',players=4,selected=null,search='',sortBy='value',now=Date.now(),operationsCache=[],showAreaPoints=true,eventTeam='all',eventKind='all',eventsLimit=40,includeAreaScore=true;
 let strategicMap=null;
@@ -7,7 +8,30 @@ let mapViewState={center:[14.42,50.087],zoom:11.4,userMoved:false};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const teamColor=owner=>({'Cosa Nostra':'#32b968','Spiriti':'#5797db','Zemunski klan':'#a475d8','Yakuza':'#e56a67','Los Bandidos':'#dcb467'})[owner]||'#64746b';
 const cap=n=>Number(n||0).toLocaleString('cs-CZ');
-async function load(){try{const content=await Promise.all(paths.map(p=>fetch(`./data/${p}?v=${Date.now()}`,{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error(p+' HTTP '+r.status);return r.json();})));[data.topology,data.rules,data.checkpoint,data.captures]=content;refresh();}catch(e){app.innerHTML=`<div class="loading bad">Nelze načíst data: ${esc(e.message)}</div>`;}}
+async function fetchCaptures(){
+ // GitHub Actions commits made with GITHUB_TOKEN do not trigger a Pages rebuild.
+ // Read the public raw file on main directly; fall back to the published snapshot.
+ try {
+  const r=await fetch(liveCaptures+'?v='+Math.floor(Date.now()/120000),{cache:'no-store'});
+  if(!r.ok)throw new Error('Raw '+r.status);
+  const events=await r.json();
+  if(!Array.isArray(events)||!events.length)throw new Error('Prázdná historie');
+  return events;
+ }catch(err){
+  console.warn('GitHub raw data unavailable, using Pages snapshot:',err);
+  const r=await fetch('./data/captures.json?v='+Math.floor(Date.now()/120000),{cache:'no-store'});
+  if(!r.ok)throw new Error('captures.json HTTP '+r.status);
+  const events=await r.json();
+  if(!Array.isArray(events)||!events.length)throw new Error('Prázdná historie');
+  return events;
+ }
+}
+async function load(){
+ try{
+  const content=await Promise.all(paths.map(p=>p==='captures.json'?fetchCaptures():fetch('./data/'+p+'?v='+Date.now(),{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error(p+' HTTP '+r.status);return r.json();})));
+  [data.topology,data.rules,data.checkpoint,data.captures]=content;refresh();
+ }catch(e){app.innerHTML=`<div class="loading bad">Nelze načíst data: ${esc(e.message)}</div>`;}
+}
 function refresh(){now=Date.now();state=reconstruct(data.topology,data.rules,data.checkpoint,data.captures,now);operationsCache=[];render();}
 function nav(){return `<nav class="nav">${[['overview','Přehled'],['map','Mapa'],['targets','Útok'],['operations','Operace'],['opportunities','Decay'],['defense','Obrana'],['events','Události']].map(([id,name])=>`<button data-view="${id}" class="${view===id?'active':''}">${name}</button>`).join('')}</nav>`;}
 function top(){let issue=state.errors.length?`<div class="warning"><b>${state.errors.length} chyb ve vstupních událostech</b><p>${state.errors.slice(0,4).map(esc).join('<br>')}</p></div>`:'';
@@ -120,4 +144,16 @@ function render(){if(strategicMap){const m=strategicMap;strategicMap=null;m.remo
 app.addEventListener('click',e=>{const st=e.target.closest('[data-station]');if(st){selected=Number(st.dataset.station);render();return;}const v=e.target.closest('[data-view]');if(v){selected=null;view=v.dataset.view;render();return;}if(e.target.closest('#close-detail')){selected=null;render();return;}if(e.target.closest('#more-events')){eventsLimit+=40;render();return;}const mode=e.target.closest('[data-score-mode]');if(mode){includeAreaScore=mode.dataset.scoreMode==='total';render();return;}});
 app.addEventListener('change',e=>{if(e.target.id==='players'){players=Number(e.target.value);operationsCache=[];render();}if(e.target.id==='sort'){sortBy=e.target.value;render();}if(e.target.id==='area-points'){showAreaPoints=e.target.checked;render();}if(e.target.id==='event-team'){eventTeam=e.target.value;eventsLimit=40;render();}if(e.target.id==='event-kind'){eventKind=e.target.value;eventsLimit=40;render();}});
 app.addEventListener('input',e=>{if(e.target.id==='search'){search=e.target.value; const pos=e.target.selectionStart;render();const el=document.getElementById('search');el?.focus();el?.setSelectionRange(pos,pos);}});
-load();setInterval(()=>{if(data.topology)refresh();},60000);
+load();
+setInterval(()=>{if(data.topology)refresh();},60000);
+setInterval(async()=>{
+ if(!data.topology)return;
+ try{
+  const captures=await fetchCaptures();
+  const previousId=Math.max(...data.captures.map(e=>e.id));
+  const incomingId=Math.max(...captures.map(e=>e.id));
+  if(incomingId>previousId && captures.length>=data.captures.length){
+   data.captures=captures;refresh();
+  }
+ }catch(e){console.warn('Aktualizaci historie nelze načíst:',e);}
+},120000);
