@@ -33,7 +33,7 @@ Uvedený objekt je **jen ukázka formátu, ne skutečné obsazení**. Dodržte �
 
 - Přepínání **Celkem / Bez území** přepočítává pořadí všech týmů. „Bez území“ obsahuje tramvajové, vlakové a případné metro body.
 - **Jízdenky** se počítají z obsazení mezi 03:00 a následující 02:59:59 v Europe/Prague: tramvajové obsazení stojí počet zabírajících hráčů, vlakové a metro eventy nula. Každý tým má 120 jízdenek na den, reset je ve 03:00. Výpočet vychází z posledního nahraného exportu, nejde o živé saldo serveru.
-- Vlakové obsazení se započítává do skóre jako tramvajové (bez územního bonusu) a přitom nečerpá jízdenky.
+- Vlakové obsazení se započítává do samostatných vlakových bodů a nečerpá jízdenky ani nevytváří území. Podle porovnání s oficiálním skóre se u první vlakové akce nepřičítá tramvajový bonus +2; regresní test chrání referenční skóre po ID 417.
 
 ## Události a skóre
 
