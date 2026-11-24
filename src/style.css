@@ -193,3 +193,41 @@
 .detail .history-content b{font-size:12px}
 .detail .history-team{display:flex;align-items:center;gap:6px;font-size:11px}
 @media(max-width:500px){.detail{padding:13px}.detail-name-line{gap:9px}.detail-value{width:35px;height:35px;flex-basis:35px;font-size:17px}.score-table-head,.score-table-line{grid-template-columns:minmax(0,.85fr) minmax(0,1fr) minmax(0,1fr);gap:6px}.score-table-line{font-size:11px}.score-table-line b{font-size:12px}.detail-metric>span{font-size:11px}}
+
+/* Events: scannable chronological activity feed, with retained decay beside the loss. */
+.event-day-heading{padding:12px 0 7px;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.045em;border-bottom:1px solid var(--stroke)}
+.event-day-heading:not(:first-child){margin-top:7px}
+.event-list .event-open{gap:11px;padding:12px 0;align-items:flex-start}
+.event-list .event-card:last-child{border-bottom:0}
+.event-list .event-value{flex:0 0 36px;width:36px;height:36px;min-width:36px;font-size:14px;margin-top:2px}
+.event-score-line{display:flex;align-items:baseline;gap:4px 15px;flex-wrap:wrap;padding-top:3px;font-size:11px}
+.event-score-gain,.event-score-loss{display:inline-flex;align-items:baseline;gap:5px;flex-wrap:wrap}
+.event-score-line strong{font-size:13px;font-variant-numeric:tabular-nums}
+.event-retained{color:var(--muted)!important;font-size:10px!important;font-weight:600}
+.event-unverified{color:var(--muted)}
+.event-time{opacity:.85;font-variant-numeric:tabular-nums}
+.event-chevron{font-size:22px;line-height:25px;color:var(--muted);align-self:center}
+.event-open:hover .event-chevron{color:var(--text)}
+/* Keep the same event information on the overview, but let it breathe on the dedicated page. */
+.recent-panel .event-score-line{gap:3px 10px;font-size:10px}
+.recent-panel .event-score-line strong{font-size:11px}
+/* Operations: keep attack and defense visually distinct without duplicating the filters. */
+.operation-filters .filter{min-width:0}
+.operation-search-filter{flex:1 1 210px}
+.operation-search-filter input{width:100%;min-width:0;background:var(--surface);color:var(--text);border:1px solid var(--stroke);padding:10px;font:inherit}
+.operation-search-filter input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.strategy-context{font-size:11px;color:var(--muted);margin:4px 0 8px}
+.strategy-subject{min-width:0}
+.strategy-subject small{display:flex!important;align-items:center;gap:5px;flex-wrap:wrap}
+.strategy-subject .dot{flex:none}
+.strategy-row:hover{background:#ffffff08}
+.strategy-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.strategy-row .strategy-scores>b{font-size:14px}
+@media(max-width:500px){
+ .event-list .event-value{flex-basis:34px;width:34px;height:34px;min-width:34px}
+ .event-list .event-open{gap:9px}
+ .event-score-line{gap:5px 12px}
+ .operation-filters{gap:8px}
+ .operation-search-filter{flex-basis:100%}
+ .strategy-row .strategy-scores>b{font-size:13px}
+}
