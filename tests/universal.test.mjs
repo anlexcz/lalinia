@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {reconstruct, eventFeed, impactOf, lossOf, parseCaptureTime, displayedScore} from '../src/engine.js';
+import {reconstruct, eventFeed, impactOf, lossOf, parseCaptureTime, displayedScore, trainLockAt} from '../src/engine.js';
 const read=name=>JSON.parse(fs.readFileSync(new URL('../data/'+name+'.json',import.meta.url)));
 const top=read('topology'),rules=read('rules'),checkpoint=read('checkpoint');
 const events=read('captures').filter(e=>e.id<=428);
@@ -29,4 +29,25 @@ for(const [team,score] of Object.entries(state.scoring)){
  const own=[...state.states.values()].find(s=>s.category==='tram'&&s.owner===team);
  if(own)assert.ok(lossOf(state,own.id,rules,team));
 }
+
+const braníkId=top.stations.find(s=>s.category==='train'&&s.name==='Braník').id;
+const beforeLock=reconstruct(top,rules,checkpoint,events,parseCaptureTime('22. 11. 2026, 02:59:59'));
+const afterLock=reconstruct(top,rules,checkpoint,events,parseCaptureTime('22. 11. 2026, 03:00:00'));
+const muchLater=reconstruct(top,rules,checkpoint,events,parseCaptureTime('24. 11. 2026, 13:30:00'));
+assert.equal(trainLockAt(parseCaptureTime('21. 11. 2026, 08:06:43'),rules),parseCaptureTime('22. 11. 2026, 03:00:00'));
+assert.equal(beforeLock.states.get(braníkId).locked,false);
+assert.equal(afterLock.states.get(braníkId).locked,true);
+assert.equal(beforeLock.states.get(braníkId).value,7);
+assert.equal(afterLock.states.get(braníkId).value,7);
+assert.equal(muchLater.states.get(braníkId).value,7,'train value must freeze rather than decay after its event day');
+assert.equal(muchLater.states.get(braníkId).needed,null,'locked train cannot be recaptured');
+assert.deepEqual(muchLater.states.get(braníkId).pending,[],'locked train has no future decay');
+assert.equal(muchLater.states.get(braníkId).owner,'Yakuza');
+assert.equal(muchLater.scoring.Yakuza.train,8,'train score is retained after the end of its event day');
+assert.equal(muchLater.scoring['Cosa Nostra'].train,20);
+const kolovraty=top.stations.find(s=>s.category==='train'&&s.name==='Kolovraty').id;
+assert.equal(muchLater.states.get(kolovraty).owner,'Zemunski klan','same-day train takeover remains valid');
+assert.equal(muchLater.scoring['Zemunski klan'].train,24);
+console.log('OK: trains lock at 03:00, preserve their owner and value, retain scores and use zero tickets');
+
 console.log('OK: universal team scores, decay retention, event changes, event filters and team-based operations');
