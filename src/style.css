@@ -241,3 +241,12 @@
 /* Podtržený název značí konečnou zastávku (přímé body ×2). */
 .event-value-wrap{display:inline-flex;align-items:center;flex:none;align-self:flex-start}
 .terminus-name{text-decoration-line:underline;text-decoration-thickness:1.5px;text-underline-offset:4px;text-decoration-color:currentColor}
+
+/* Upcoming decay: separate dashed ring, never replaces team fill. */
+.decay-yellow{--decay-color:#facc15}.decay-orange{--decay-color:#fb923c}.decay-red{--decay-color:#ef4444}
+.map-point,.decay-symbol{position:relative}
+.map-point:is(.decay-yellow,.decay-orange,.decay-red)::after,.decay-symbol:is(.decay-yellow,.decay-orange,.decay-red)::after{content:"";position:absolute;inset:-5px;border:2px dashed var(--decay-color);border-radius:50%;pointer-events:none}
+.strategic-map.map-distant .map-point:is(.decay-yellow,.decay-orange,.decay-red)::after{border-width:4px}
+.strategy-row.decay-row{display:flex;align-items:center;gap:12px;text-align:left;width:100%}
+.decay-symbol{display:grid;place-items:center;flex:0 0 25px;width:25px;height:25px;border-radius:50%;border:1px solid #121715;color:white;font-weight:800;margin:4px}
+.decay-row .strategy-subject{flex:1;min-width:0}.decay-row .strategy-scores{margin-left:auto;text-align:right;flex-shrink:0}.decay-row .decay-time{color:var(--decay-color,var(--muted))}

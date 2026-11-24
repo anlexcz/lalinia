@@ -8,7 +8,7 @@ const routes={overview:'prehled',map:'mapa',strategy:'operace',events:'udalosti'
 const viewFromHash=()=>Object.keys(routes).find(key=>'#/'+routes[key]===window.location.hash)||'overview';
 let data={},state,view=viewFromHash(),players=4,selected=null,search='',sortBy='value',now=Date.now(),operationsCache=[],showAreaPoints=true,eventTeam='all',eventKind='all',eventsLimit=30,includeAreaScore=true,scoreMode='total';
 let strategicMap=null;
-let selectedTeam=(()=>{try{return localStorage.getItem('lalinia-team')||'Cosa Nostra'}catch{return 'Cosa Nostra'}})(),expandedScore=null,operationTab='attack',opponent='all',mapTram=true,mapTrain=true,mapEdges=true,eventSearch='',operationSearch='';
+let selectedTeam=(()=>{try{return localStorage.getItem('lalinia-team')||'Cosa Nostra'}catch{return 'Cosa Nostra'}})(),expandedScore=null,operationTab='attack',decayTeam='all',mapDecay=true,opponent='all',mapTram=true,mapTrain=true,mapEdges=true,eventSearch='',operationSearch='';
 let mapViewState={center:[14.42,50.087],zoom:11.4,userMoved:false};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const teamColor=owner=>({'Cosa Nostra':'#32b968','Spiriti':'#5797db','Zemunski klan':'#a475d8','Yakuza':'#e56a67','Los Bandidos':'#dcb467'})[owner]||'#64746b';
@@ -120,8 +120,27 @@ function operationsView(){
  const best=operationsCache.filter(o=>o.cost<=36).slice(0,24);
  return `<div class="toolbar"><h2>Společné operace</h2>${personFilter()}</div><section class="panel">${best.map((o,i)=>`<div class="operation"><div class="operation-heading"><b>${i+1}. ${o.ids.map(id=>esc(state.states.get(id).name)).join(' + ')}</b><strong class="good">+${cap(o.ourGain)} nám</strong></div><div class="op-details"><span>${o.maxPlayers} hráčů max.</span><span>${o.cost} jízdenek</span><span class="bad">−${cap(o.opponentLoss)} soupeřům</span><span>Proti lídrovi +${cap(o.leaderGapChange)}</span></div><div class="operation-links">${o.ids.map(id=>`<button class="pill" data-station="${id}">${esc(state.states.get(id).name)} ↗</button>`).join('')}</div></div>`).join('')||'<div class="empty">Pro tuto skupinu zatím žádné dostupné kombinace.</div>'}</section>`;
 }
+function nextDecay(s,at=now){
+ if(s.category!=='tram'||!s.owner)return null;
+ return (s.pending||[]).find(t=>t.at>at)||null;
+}
+function decayLevel(t,at=now){
+ if(!t)return '';
+ const h=(t.at-at)/3600000;
+ return h<=0?'':h<2?'red':h<6?'orange':h<=24?'yellow':'';
+}
+function decayCountdown(t){
+ const minutes=Math.max(0,Math.ceil((t.at-now)/60000)),h=Math.floor(minutes/60),m=minutes%60;
+ return (h?h+' h ':'')+m+' min';
+}
+function decayView(modes){
+ const query=operationSearch.trim().toLocaleLowerCase('cs');
+ const rows=[...state.states.values()].map(s=>({s,t:nextDecay(s)})).filter(({s,t})=>t&&(!query||s.name.toLocaleLowerCase('cs').includes(query))&&(decayTeam==='all'||(decayTeam==='own'?s.owner===selectedTeam:s.owner!==selectedTeam))).sort((a,b)=>a.t.at-b.t.at||a.s.name.localeCompare(b.s.name,'cs'));
+ return `<div class="toolbar"><h2>Operace · ${esc(selectedTeam)}</h2>${modes}</div><div class="operation-filters"><div class="filter"><label for="decay-team">Tým</label><select id="decay-team">${[['all','Všechny týmy'],['enemy','Soupeři'],['own','Vlastní']].map(([v,l])=>`<option value="${v}" ${decayTeam===v?'selected':''}>${l}</option>`).join('')}</select></div><div class="filter operation-search-filter"><label for="operation-search">Zastávka</label><input id="operation-search" type="search" autocomplete="off" placeholder="Hledat zastávku…" value="${esc(operationSearch)}"></div></div><div class="strategy-context">${rows.length} zastávek · předpokládaný decay</div><section class="panel strategy-list">${rows.map(({s,t})=>{const level=decayLevel(t);return `<button class="strategy-row decay-row" data-decay-station="${s.id}"><span class="decay-symbol ${level?'decay-'+level:''}" style="background:${teamColor(s.owner)}">${s.value}</span><span class="strategy-subject"><b>${esc(s.name)}</b><small>${esc(s.owner)} · ${fmtShort(t.at)}</small></span><span class="strategy-scores"><b>${t.from} → ${t.to}</b><small class="decay-time ${level?'decay-'+level:''}">${decayCountdown(t)}</small></span></button>`}).join('')||'<div class="empty">Žádné odpovídající zastávky.</div>'}</section>`;
+}
 function strategyView(){
- const modes=`<div class="score-modes"><button data-operation-tab="attack" class="${operationTab==='attack'?'active':''}">Útok</button><button data-operation-tab="defense" class="${operationTab==='defense'?'active':''}">Obrana</button></div>`;
+ const modes=`<div class="score-modes"><button data-operation-tab="attack" class="${operationTab==='attack'?'active':''}">Útok</button><button data-operation-tab="defense" class="${operationTab==='defense'?'active':''}">Obrana</button><button data-operation-tab="decay" class="${operationTab==='decay'?'active':''}">Decay</button></div>`;
+ if(operationTab==='decay')return decayView(modes);
  const teamFilter=operationTab==='attack'?`<div class="filter"><label for="opponent">Cílový tým</label><select id="opponent"><option value="all">Všechny týmy</option>${Object.keys(state.scoring).filter(t=>t!==selectedTeam).map(t=>`<option value="${esc(t)}" ${opponent===t?'selected':''}>${esc(t)}</option>`).join('')}</select></div>`:'';
  const query=operationSearch.trim().toLocaleLowerCase('cs');
  const matchName=t=>!query||t.station.name.toLocaleLowerCase('cs').includes(query);
@@ -151,7 +170,7 @@ function eventsView(){
 }
 function mapView(){
  const n=[...state.states.values()].filter(t=>t.category==='tram').length;
- return `<div class="toolbar"><h2>Herní mapa</h2><span class="note">${n} tramvajových zastávek</span></div><div class="map-layers"><label><input type="checkbox" id="map-tram" ${mapTram?'checked':''}> Tramvaje</label><label><input type="checkbox" id="map-train" ${mapTrain?'checked':''}> Vlaky</label><label><input type="checkbox" id="map-edges" ${mapEdges?'checked':''}> Spojnice</label></div><div class="map-wrap"><div id="strategic-map" class="strategic-map"></div></div>`;
+ return `<div class="toolbar"><h2>Herní mapa</h2><span class="note">${n} tramvajových zastávek</span></div><div class="map-layers"><label><input type="checkbox" id="map-tram" ${mapTram?'checked':''}> Tramvaje</label><label><input type="checkbox" id="map-train" ${mapTrain?'checked':''}> Vlaky</label><label><input type="checkbox" id="map-edges" ${mapEdges?'checked':''}> Spojnice</label><label><input type="checkbox" id="map-decay" ${mapDecay?'checked':''}> Decay</label></div><div class="map-wrap"><div id="strategic-map" class="strategic-map"></div></div>`;
 }
 function initStrategicMap(){
  const el=document.getElementById('strategic-map');if(!el)return;
@@ -188,7 +207,8 @@ function initStrategicMap(){
   }
  });
  points.forEach(s=>{
-   const icon=L.divIcon({html:'<div class="map-point '+(s.category==='train'?'train':'')+'" style="background:'+teamColor(s.owner)+'">'+s.value+'</div>',className:'map-point-wrap',iconSize:[27,27],iconAnchor:[13,13]});
+   const level=mapDecay?decayLevel(nextDecay(s)):'';
+   const icon=L.divIcon({html:'<div class="map-point '+(s.category==='train'?'train':'')+(level?' decay-'+level:'')+'" style="background:'+teamColor(s.owner)+'">'+s.value+'</div>',className:'map-point-wrap',iconSize:[27,27],iconAnchor:[13,13]});
    const marker=L.marker([s.lat,s.lon],{icon});
    marker.bindTooltip(esc(s.name)+' · '+esc(s.owner||'Neutrální')+' · '+s.value,{direction:'top'});
    marker.on('click',()=>{selected=s.id;render();});
@@ -238,8 +258,8 @@ function stationDetail(id){
 }
 
 function render(preserveScroll=false){const scrollY=window.scrollY;if(strategicMap){const m=strategicMap;strategicMap=null;m.remove();}const body=view==='overview'?overview():view==='map'?mapView():view==='strategy'?strategyView():view==='events'?eventsView():overview();app.innerHTML=`<div class="app">${top()}${nav()}${selected!==null?stationDetail(selected):body}</div>`; if(view==='map'&&selected===null) initStrategicMap();if(preserveScroll)window.scrollTo(0,scrollY);}
-app.addEventListener('click',e=>{const exp=e.target.closest('[data-expand-team]');if(exp){expandedScore=expandedScore===exp.dataset.expandTeam?null:exp.dataset.expandTeam;render();return;}const tab=e.target.closest('[data-operation-tab]');if(tab){operationTab=tab.dataset.operationTab;render();return;}const st=e.target.closest('[data-station]');if(st){selected=Number(st.dataset.station);render();return;}const v=e.target.closest('[data-view]');if(v){const route=v.dataset.view;selected=null;if(view===route){render();return;}view=route;window.location.hash='/'+routes[route];render();window.scrollTo(0,0);return;}if(e.target.closest('#close-detail')){selected=null;render();return;}if(e.target.closest('#more-events')){eventsLimit+=30;render();return;}const mode=e.target.closest('[data-score-mode]');if(mode){scoreMode=mode.dataset.scoreMode;includeAreaScore=scoreMode==='total';render();return;}});
-app.addEventListener('change',e=>{if(e.target.id==='players'){players=Number(e.target.value);operationsCache=[];render();}if(e.target.id==='sort'){sortBy=e.target.value;render();}if(e.target.id==='area-points'){showAreaPoints=e.target.checked;render();}if(e.target.id==='event-team'){eventTeam=e.target.value;eventsLimit=30;render();}if(e.target.id==='event-kind'){eventKind=e.target.value;eventsLimit=30;render();}if(e.target.id==='selected-team'){selectedTeam=e.target.value;try{localStorage.setItem('lalinia-team',selectedTeam)}catch{}render();}if(e.target.id==='opponent'){opponent=e.target.value;render();}if(e.target.id==='map-tram'){mapTram=e.target.checked;render();}if(e.target.id==='map-train'){mapTrain=e.target.checked;render();}if(e.target.id==='map-edges'){mapEdges=e.target.checked;render();}});
+app.addEventListener('click',e=>{const exp=e.target.closest('[data-expand-team]');if(exp){expandedScore=expandedScore===exp.dataset.expandTeam?null:exp.dataset.expandTeam;render();return;}const tab=e.target.closest('[data-operation-tab]');if(tab){operationTab=tab.dataset.operationTab;render();return;}const ds=e.target.closest('[data-decay-station]');if(ds){const s=state.states.get(Number(ds.dataset.decayStation));if(s&&Number.isFinite(s.lat)&&Number.isFinite(s.lon)){mapTram=true;mapViewState={center:[s.lon,s.lat],zoom:15,userMoved:true};view='map';selected=null;window.location.hash='/'+routes.map;render();window.scrollTo(0,0);}return;}const st=e.target.closest('[data-station]');if(st){selected=Number(st.dataset.station);render();return;}const v=e.target.closest('[data-view]');if(v){const route=v.dataset.view;selected=null;if(view===route){render();return;}view=route;window.location.hash='/'+routes[route];render();window.scrollTo(0,0);return;}if(e.target.closest('#close-detail')){selected=null;render();return;}if(e.target.closest('#more-events')){eventsLimit+=30;render();return;}const mode=e.target.closest('[data-score-mode]');if(mode){scoreMode=mode.dataset.scoreMode;includeAreaScore=scoreMode==='total';render();return;}});
+app.addEventListener('change',e=>{if(e.target.id==='players'){players=Number(e.target.value);operationsCache=[];render();}if(e.target.id==='sort'){sortBy=e.target.value;render();}if(e.target.id==='area-points'){showAreaPoints=e.target.checked;render();}if(e.target.id==='event-team'){eventTeam=e.target.value;eventsLimit=30;render();}if(e.target.id==='event-kind'){eventKind=e.target.value;eventsLimit=30;render();}if(e.target.id==='selected-team'){selectedTeam=e.target.value;try{localStorage.setItem('lalinia-team',selectedTeam)}catch{}render();}if(e.target.id==='opponent'){opponent=e.target.value;render();}if(e.target.id==='decay-team'){decayTeam=e.target.value;render();}if(e.target.id==='map-decay'){mapDecay=e.target.checked;render();}if(e.target.id==='map-tram'){mapTram=e.target.checked;render();}if(e.target.id==='map-train'){mapTrain=e.target.checked;render();}if(e.target.id==='map-edges'){mapEdges=e.target.checked;render();}});
 app.addEventListener('input',e=>{if(e.target.id==='event-search'){eventSearch=e.target.value;eventsLimit=30;const pos=e.target.selectionStart;render();const el=document.getElementById('event-search');el?.focus();el?.setSelectionRange(pos,pos);return;}if(e.target.id==='operation-search'){operationSearch=e.target.value;const pos=e.target.selectionStart;render();const el=document.getElementById('operation-search');el?.focus();el?.setSelectionRange(pos,pos);return;}if(e.target.id==='search'){search=e.target.value; const pos=e.target.selectionStart;render();const el=document.getElementById('search');el?.focus();el?.setSelectionRange(pos,pos);}});
 window.addEventListener('hashchange',()=>{const next=viewFromHash();if(next!==view||selected!==null){view=next;selected=null;if(state){render();window.scrollTo(0,0);}}});
 load();
