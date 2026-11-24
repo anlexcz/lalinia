@@ -185,8 +185,7 @@ def main() -> int:
     email = os.getenv('LA_LINIA_EMAIL', '').strip()
     password = os.getenv('LA_LINIA_PASSWORD', '')
     if not email or not password:
-        print('Chybí GitHub Secrets LA_LINIA_EMAIL / LA_LINIA_PASSWORD. Přihlašování se přeskočí.')
-        return 0
+        raise SyncError('Chybí GitHub Secrets LA_LINIA_EMAIL / LA_LINIA_PASSWORD. Synchronizace nebyla provedena.')
     existing = json.loads(OUTPUT.read_text(encoding='utf-8'))
     topology = json.loads(TOPOLOGY.read_text(encoding='utf-8'))
     checkpoint = json.loads((OUTPUT.parent / 'checkpoint.json').read_text(encoding='utf-8'))
