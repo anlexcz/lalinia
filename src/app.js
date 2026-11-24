@@ -6,7 +6,7 @@ let lastSuccessfulSync=null;
 const app=document.querySelector('#app');
 let data={},state,view='overview',players=4,selected=null,search='',sortBy='value',now=Date.now(),operationsCache=[],showAreaPoints=true,eventTeam='all',eventKind='all',eventsLimit=30,includeAreaScore=true,scoreMode='total';
 let strategicMap=null;
-let selectedTeam=(()=>{try{return localStorage.getItem('lalinia-team')||'Cosa Nostra'}catch{return 'Cosa Nostra'}})(),expandedScore=null,operationTab='attack',opponent='all',mapTram=true,mapTrain=true,mapEdges=true,eventSearch='';
+let selectedTeam=(()=>{try{return localStorage.getItem('lalinia-team')||'Cosa Nostra'}catch{return 'Cosa Nostra'}})(),expandedScore=null,operationTab='attack',opponent='all',mapTram=true,mapTrain=true,mapEdges=true,eventSearch='',operationSearch='';
 let mapViewState={center:[14.42,50.087],zoom:11.4,userMoved:false};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const teamColor=owner=>({'Cosa Nostra':'#32b968','Spiriti':'#5797db','Zemunski klan':'#a475d8','Yakuza':'#e56a67','Los Bandidos':'#dcb467'})[owner]||'#64746b';
@@ -87,10 +87,11 @@ function overview(){
 }
 function eventCard(e){
  const changes=e.impact?.changes||{},gain=changes[e.team],loss=e.previousOwner&&e.previousOwner!==e.team?changes[e.previousOwner]:null;
- const action=e.kind==='reinforce'?'posílil':e.kind==='first'?'obsadil':'převzal';
- const relation=e.previousOwner&&e.previousOwner!==e.team?`${esc(e.team)} převzal od ${esc(e.previousOwner)}`:`${esc(e.team)} ${action}`;
- const deltas=e.impact?`<div class="event-deltas"><span class="good">${gain?.direct>=0?'+':''}${cap(gain?.direct||0)} přímé · ${gain?.total>=0?'+':''}${cap(gain?.total||0)} celkem</span>${loss?`<span class="bad">${cap(loss.direct||0)} přímé · ${cap(loss.total||0)} celkem</span>`:''}</div>`:`<small>Bodové změny před checkpointem nejsou přesně doložené.</small>`;
- return `<div class="event-card"><button class="event-open" data-station="${e.stationId}"><i class="event-indicator" style="background:${teamColor(e.team)}"></i><span class="event-main"><b>${esc(e.station)}</b><small>${relation} · ${fmtShort(e.ms)}</small>${deltas}${e.impact?.retainedOnTakeover?`<small class="retained-note">Původnímu týmu zůstalo díky decay +${cap(e.impact.retainedOnTakeover)} přímých bodů</small>`:''}</span><span class="event-value ${e.category==='train'?'train':''}" style="background:${teamColor(e.team)}">${e.value}</span></button></div>`;
+ const relation=e.kind==='takeover'?`${esc(e.team)} · převzetí od ${esc(e.previousOwner)}`:`${esc(e.team)} · ${e.kind==='reinforce'?'posílení':'první obsazení'}`;
+ const signed=n=>`${n>0?'+':n<0?'−':''}${cap(Math.abs(n))}`;
+ const retained=e.impact?.retainedOnTakeover||0;
+ const score=e.impact?`<div class="event-score-line">${gain?`<span class="event-score-gain">${esc(e.team)} <strong class="good">${signed(gain.total)}</strong></span>`:''}${loss?`<span class="event-score-loss">${esc(e.previousOwner)} <strong class="bad">${signed(loss.total)}</strong>${retained>0?` <small class="event-retained">(+${cap(retained)} decay)</small>`:''}</span>`:''}</div>`:'<small class="event-unverified">Bodové změny před checkpointem nejsou přesně doložené.</small>';
+ return `<div class="event-card"><button class="event-open" data-station="${e.stationId}"><span class="event-value ${e.category==='train'?'train':''}" style="background:${teamColor(e.team)}">${e.value}</span><span class="event-main"><b>${esc(e.station)}</b><small>${relation}</small><small class="event-time">${fmtShort(e.ms)} · ${e.value} hráčů</small>${score}</span><span class="event-chevron" aria-hidden="true">›</span></button></div>`;
 }
 function targetRowSimple(x){return `<div class="row"><button data-station="${x.station.id}"><b>${esc(x.station.name)}</b><br><span class="muted">${esc(x.owner||'Neutrální')} · ${x.cost} jízdenek · území ${x.areaGain>=0?'+':''}${x.areaGain}</span></button><span><strong class="good">+${cap(x.gain)}</strong>${x.owner?`<br><span class="bad note">−${cap(x.enemyLoss)} soupeř</span>`:''}</span></div>`;}
 function defenses(){return [...state.states.values()].filter(t=>t.category==='tram'&&t.owner===selectedTeam).map(t=>lossOf(state,t.id,data.rules,selectedTeam)).filter(Boolean).sort((a,b)=>b.loss-a.loss)}
@@ -105,23 +106,32 @@ function operationsView(){
 }
 function strategyView(){
  const modes=`<div class="score-modes"><button data-operation-tab="attack" class="${operationTab==='attack'?'active':''}">Útok</button><button data-operation-tab="defense" class="${operationTab==='defense'?'active':''}">Obrana</button></div>`;
- const targetsHtml=`<div class="filter"><label for="opponent">${operationTab==='attack'?'Cílový tým':'Modelový útočník'}</label><select id="opponent"><option value="all">Všechny týmy</option>${Object.keys(state.scoring).filter(t=>t!==selectedTeam).map(t=>`<option value="${esc(t)}" ${opponent===t?'selected':''}>${esc(t)}</option>`).join('')}</select></div>`;
- const items=operationTab==='attack'?targets().filter(t=>t.cost<=players&&(!t.station.protectedUntil||now>=t.station.protectedUntil)).slice(0,100).map(t=>{
+ const teamFilter=operationTab==='attack'?`<div class="filter"><label for="opponent">Cílový tým</label><select id="opponent"><option value="all">Všechny týmy</option>${Object.keys(state.scoring).filter(t=>t!==selectedTeam).map(t=>`<option value="${esc(t)}" ${opponent===t?'selected':''}>${esc(t)}</option>`).join('')}</select></div>`:'';
+ const query=operationSearch.trim().toLocaleLowerCase('cs');
+ const matchName=t=>!query||t.station.name.toLocaleLowerCase('cs').includes(query);
+ const list=operationTab==='attack'?targets().filter(t=>t.cost<=players&&(!t.station.protectedUntil||now>=t.station.protectedUntil)&&matchName(t)).slice(0,100).map(t=>{
   const direct=t.cost*(t.station.is_terminus?data.rules.terminus_multiplier:1)+(t.owner?0:data.rules.first_capture_bonus);
-  const lost=t.owner?t.station.value*(t.station.is_terminus?data.rules.terminus_multiplier:1):0;
-  return `<button class="strategy-row" data-station="${t.station.id}"><span><b>${esc(t.station.name)}</b><small>${esc(t.owner||'Neutrální')} · ${t.cost} hráčů / jízdenek</small></span><span class="strategy-scores"><b class="good">+${cap(t.gain)} celkem</b><small>+${cap(direct)} přímé</small>${t.owner?`<b class="bad">−${cap(t.enemyLoss)} soupeř</b><small>−${cap(lost)} přímé</small>`:''}</span></button>`;
- }).join(''):defenses().slice(0,100).map(t=>{
+  return `<button class="strategy-row" data-station="${t.station.id}"><span class="strategy-subject"><b>${esc(t.station.name)}</b><small><i class="dot" style="background:${teamColor(t.owner)}"></i>${esc(t.owner||'Neutrální')} · ${t.cost} hráčů</small></span><span class="strategy-scores"><b class="good">+${cap(t.gain)} bodů</b><small>+${cap(direct)} přímé${t.owner?` · soupeř −${cap(t.enemyLoss)}`:''}</small></span></button>`;
+ }).join(''):defenses().filter(matchName).slice(0,100).map(t=>{
   const mult=t.station.is_terminus?data.rules.terminus_multiplier:1;
-  const attacker=opponent==='all'?null:impactOf(state,t.station.id,data.rules,opponent);
-  return `<button class="strategy-row" data-station="${t.station.id}"><span><b>${esc(t.station.name)}</b><small>Hodnota ${t.station.value} · potřebuje ${t.needed} hráčů</small></span><span class="strategy-scores"><b class="bad">−${cap(t.loss)} celkem</b><small>−${cap(t.station.value*mult)} přímé</small>${attacker?`<b class="good">+${cap(attacker.gain)} soupeř</b><small>+${cap(attacker.cost*mult)} přímé</small>`:''}</span></button>`;
+  return `<button class="strategy-row" data-station="${t.station.id}"><span class="strategy-subject"><b>${esc(t.station.name)}</b><small>Hodnota ${t.station.value} · k převzetí ${t.needed} hráčů</small></span><span class="strategy-scores"><b class="bad">−${cap(t.loss)} bodů</b><small>−${cap(t.station.value*mult)} přímé${t.station.protectedUntil&&t.station.protectedUntil>now?' · chráněná':''}</small></span></button>`;
  }).join('');
- return `<div class="toolbar"><h2>Operace · ${esc(selectedTeam)}</h2>${modes}</div><div class="operation-filters">${personFilter()}${targetsHtml}</div><section class="panel strategy-list">${items||'<div class="empty">Žádný odpovídající cíl.</div>'}</section>`;
+ return `<div class="toolbar"><h2>Operace · ${esc(selectedTeam)}</h2>${modes}</div><div class="operation-filters">${operationTab==='attack'?personFilter():''}${teamFilter}<div class="filter operation-search-filter"><label for="operation-search">Zastávka</label><input id="operation-search" type="search" autocomplete="off" placeholder="Hledat zastávku…" value="${esc(operationSearch)}"></div></div><div class="strategy-context">${operationTab==='attack'?'Možný zisk včetně území':'Možná ztráta včetně území'}</div><section class="panel strategy-list">${list||'<div class="empty">Žádné odpovídající zastávky.</div>'}</section>`;
 }
 function eventsView(){
  const teams=Object.keys(state.scoring);
  const rows=eventFeed(state,{team:eventTeam,kind:eventKind}).filter(x=>!eventSearch||x.station.toLocaleLowerCase('cs').includes(eventSearch.toLocaleLowerCase('cs')));
  const select=(id,opts,value)=>`<select id="${id}">${opts.map(([v,label])=>`<option value="${esc(v)}" ${v===value?'selected':''}>${esc(label)}</option>`).join('')}</select>`;
- return `<div class="toolbar"><h2>Události</h2><span class="note">${rows.length} záznamů</span></div><div class="event-filters">${select('event-team',[['all','Všechny týmy'],...teams.map(t=>[t,t])],eventTeam)}${select('event-kind',[['all','Všechny typy'],['first','První obsazení'],['takeover','Převzetí'],['reinforce','Posílení']],eventKind)}<input id="event-search" placeholder="Hledat zastávku…" value="${esc(eventSearch)}"></div><section class="panel event-list">${rows.slice(0,eventsLimit).map(eventCard).join('')||'<div class="empty">Žádné odpovídající události.</div>'}</section>${rows.length>eventsLimit?`<button class="load-more" id="more-events">Načíst dalších 30 · zbývá ${rows.length-eventsLimit}</button>`:''}`;
+ const formatDay=ms=>new Date(ms).toLocaleDateString('sv-SE',{timeZone:'Europe/Prague'});
+ const today=formatDay(now),yesterday=formatDay(now-86400000);
+ const prettyDay=ms=>new Date(ms).toLocaleDateString('cs-CZ',{timeZone:'Europe/Prague',weekday:'long',day:'numeric',month:'long'});
+ let previousDay=null;
+ const list=rows.slice(0,eventsLimit).map(e=>{
+  const day=formatDay(e.ms),heading=day!==previousDay?`<div class="event-day-heading">${day===today?'Dnes':day===yesterday?'Včera':prettyDay(e.ms)}</div>`:'';
+  previousDay=day;
+  return heading+eventCard(e);
+ }).join('');
+ return `<div class="toolbar"><h2>Události</h2><span class="note">${rows.length} záznamů</span></div><div class="event-filters">${select('event-team',[['all','Všechny týmy'],...teams.map(t=>[t,t])],eventTeam)}${select('event-kind',[['all','Všechny typy'],['first','První obsazení'],['takeover','Převzetí'],['reinforce','Posílení']],eventKind)}<input id="event-search" placeholder="Hledat zastávku…" value="${esc(eventSearch)}"></div><section class="panel event-list">${list||'<div class="empty">Žádné odpovídající události.</div>'}</section>${rows.length>eventsLimit?`<button class="load-more" id="more-events">Načíst dalších 30 · zbývá ${rows.length-eventsLimit}</button>`:''}`;
 }
 function mapView(){
  const n=[...state.states.values()].filter(t=>t.category==='tram').length;
@@ -214,7 +224,7 @@ function stationDetail(id){
 function render(){if(strategicMap){const m=strategicMap;strategicMap=null;m.remove();}const body=view==='overview'?overview():view==='map'?mapView():view==='strategy'?strategyView():view==='events'?eventsView():overview();app.innerHTML=`<div class="app">${top()}${nav()}${selected!==null?stationDetail(selected):body}</div>`; if(view==='map'&&selected===null) initStrategicMap();}
 app.addEventListener('click',e=>{const exp=e.target.closest('[data-expand-team]');if(exp){expandedScore=expandedScore===exp.dataset.expandTeam?null:exp.dataset.expandTeam;render();return;}const tab=e.target.closest('[data-operation-tab]');if(tab){operationTab=tab.dataset.operationTab;render();return;}const st=e.target.closest('[data-station]');if(st){selected=Number(st.dataset.station);render();return;}const v=e.target.closest('[data-view]');if(v){selected=null;view=v.dataset.view;render();return;}if(e.target.closest('#close-detail')){selected=null;render();return;}if(e.target.closest('#more-events')){eventsLimit+=30;render();return;}const mode=e.target.closest('[data-score-mode]');if(mode){scoreMode=mode.dataset.scoreMode;includeAreaScore=scoreMode==='total';render();return;}});
 app.addEventListener('change',e=>{if(e.target.id==='players'){players=Number(e.target.value);operationsCache=[];render();}if(e.target.id==='sort'){sortBy=e.target.value;render();}if(e.target.id==='area-points'){showAreaPoints=e.target.checked;render();}if(e.target.id==='event-team'){eventTeam=e.target.value;eventsLimit=30;render();}if(e.target.id==='event-kind'){eventKind=e.target.value;eventsLimit=30;render();}if(e.target.id==='selected-team'){selectedTeam=e.target.value;try{localStorage.setItem('lalinia-team',selectedTeam)}catch{}render();}if(e.target.id==='opponent'){opponent=e.target.value;render();}if(e.target.id==='map-tram'){mapTram=e.target.checked;render();}if(e.target.id==='map-train'){mapTrain=e.target.checked;render();}if(e.target.id==='map-edges'){mapEdges=e.target.checked;render();}});
-app.addEventListener('input',e=>{if(e.target.id==='event-search'){eventSearch=e.target.value;eventsLimit=30;const pos=e.target.selectionStart;render();const el=document.getElementById('event-search');el?.focus();el?.setSelectionRange(pos,pos);return;}if(e.target.id==='search'){search=e.target.value; const pos=e.target.selectionStart;render();const el=document.getElementById('search');el?.focus();el?.setSelectionRange(pos,pos);}});
+app.addEventListener('input',e=>{if(e.target.id==='event-search'){eventSearch=e.target.value;eventsLimit=30;const pos=e.target.selectionStart;render();const el=document.getElementById('event-search');el?.focus();el?.setSelectionRange(pos,pos);return;}if(e.target.id==='operation-search'){operationSearch=e.target.value;const pos=e.target.selectionStart;render();const el=document.getElementById('operation-search');el?.focus();el?.setSelectionRange(pos,pos);return;}if(e.target.id==='search'){search=e.target.value; const pos=e.target.selectionStart;render();const el=document.getElementById('search');el?.focus();el?.setSelectionRange(pos,pos);}});
 load();
 setInterval(()=>{if(data.topology)refresh();},60000);
 setInterval(async()=>{if(!data.topology)return;await fetchSyncStatus();const el=document.getElementById('sync-stamp');if(el)el.textContent='Poslední aktualizace: '+syncTimestamp();},60000);
