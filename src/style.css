@@ -145,3 +145,7 @@
 .score-panel-head{flex-wrap:wrap}
 .score-modes{flex:0 1 auto}
 @media(max-width:480px){.score-panel-head{gap:7px}.score-modes button{padding:7px 8px;font-size:10px}}
+
+/* Oddálený pohled: zachovat týmové barvy a tvar, skrýt hodnotu a zmenšit body.
+   Marker má stále 27×27 px klikací plochu; samotná grafika se škáluje kolem středu. */
+.strategic-map.map-distant .map-point{transform:scale(.5);transform-origin:center center;font-size:0;line-height:0}
