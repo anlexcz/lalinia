@@ -65,4 +65,11 @@ assert.equal(gameDayKey(parseCaptureTime('24. 11. 2026, 02:59:59')),'2026-11-23'
 assert.equal(displayedScore(full.scoring['Cosa Nostra'],false),full.scoring['Cosa Nostra'].total-full.scoring['Cosa Nostra'].area);
 assert.equal(displayedScore(full.scoring['Cosa Nostra'],true),full.scoring['Cosa Nostra'].total);
 assert.equal(full.warnings.length,0,full.warnings.join(' | '));
+// Referenční oficiální pořadí ze stránky hry po capture #417.
+const officialAt=parseCaptureTime('24. 11. 2026, 00:01:00');
+const official=reconstruct(topology,rules,checkpoint,events,officialAt);
+for(const [team,points] of Object.entries({'Cosa Nostra':1112,'Los Bandidos':88,'Spiriti':545,'Yakuza':589,'Zemunski klan':680})){
+ assert.equal(official.scoring[team].total,points,'Score mismatch: '+team);
+}
+console.log('OK: scores match official scoreboard after event #417');
 console.log('OK: ticket reset at 03:00, all team budgets, clean vs total score, train events');
