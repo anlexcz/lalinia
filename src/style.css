@@ -237,3 +237,9 @@
 .nav a.active{border-color:var(--accent);color:var(--text)}
 .nav a:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 @media(max-width:800px){.nav a{font-size:11px;letter-spacing:0}}
+
+/* Konečné zastávky: násobič se týká přímých bodů, ne územních bonusů. */
+.event-value-wrap{display:inline-flex;align-items:center;gap:4px;flex:none;align-self:flex-start;position:relative}
+.event-multiplier,.detail-multiplier{font-size:10px;font-weight:800;white-space:nowrap;color:var(--muted);font-variant-numeric:tabular-nums}
+.event-multiplier{margin-left:-1px;align-self:center}
+.detail-multiplier{margin-left:-7px;align-self:center}
