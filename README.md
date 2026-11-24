@@ -1,6 +1,6 @@
-# La Linia – strategický přehled Cosa Nostra
+# La Linia – univerzální herní přehled
 
-Statická mobilní webová aplikace pro GitHub Pages. Obsahuje herní síť, přesné tabulky územních bonusů, rekonstrukci obsazení, decay, útoky, kombinované operace, obranu, historii zastávek a stránku Události s filtry. Územní body v přehledu lze zapnout nebo vypnout pouze pro zobrazení.
+Statická mobilní aplikace pro GitHub Pages určená všem pěti týmům. Má společný Přehled, Mapu, týmově volitelné Operace (útok/obrana) a úplnou historii Událostí. Žebříček jde seřadit podle skóre celkem nebo bez území.
 
 ## Data
 
@@ -99,3 +99,16 @@ Synchronizační skript: `scripts/sync_captures.py`. Kontroluje originální ID,
 Skript po **5. 12. 2026 03:00 Europe/Prague** přestane galerii kontaktovat. Pak lze workflow vypnout v GitHub Actions. Automatizovaný přístup by měl být v souladu s pravidly a souhlasem provozovatele Podsvětí.
 
 Test lokálně: `python -m unittest discover -s tests -p 'test_sync.py'` a `node tests/check.mjs`.
+
+
+## Univerzální rozhraní – listopad 2026
+
+- **Přehled** je pro všechny týmy stejný. V jediném kompaktním žebříčku je tým, body a zbývající denní jízdenky. Přepínač `Celkem / Bez území` přerovnává pořadí. Po rozkliknutí řádku se zobrazí rozpad na tramvajové body v riziku, uchované tramvajové body, vlak, metro a aktuální území, s procentuálním pruhem. Uchované tramvajové body jsou **tramvajové skóre mínus současná odečitatelná hodnota vlastněných zastávek**; zahrnují tak i první bonusy a historické zisky, nejde o čisté „body za decay“.
+- Pod žebříčkem je seznam **skutečných událostí za klouzavých 60 minut**, včetně změny přímých i celkových bodů obou týmů. Při převzetí s prokazatelným decay se zobrazuje, kolik přímých bodů původnímu týmu zůstalo. Bodové změny jsou **doložitelné až po výchozím checkpointu ID 331**; u dřívějších událostí není přesný historický rozpad tvrzen.
+- **Události**: posledních 30 položek, tlačítko přidává dalších 30, filtry dle týmu (včetně jeho ztrát), typu a hledaného názvu zastávky.
+- **Mapa**: nezávislé přepínače tramvají, vlaků a spojnic; tramvajové značky jsou kolečka, vlakové čtverce; obojí obsahuje aktuální herní hodnotu.
+- **Operace**: přepnutí Útok/Obrana, počet hráčů, volitelný cílový či útočící tým. Samostatné útoky rozlišují přímý bodový zisk/ztrátu od celkového dopadu včetně územních komponent.
+- Výběr týmu v horní části si web pamatuje lokálně a ovlivňuje **Operace** a detaily zastávek, ne společný Přehled.
+- Synchronizace zůstává každých 10 minut přes GitHub Actions; web kontroluje nové události každé dvě minuty. Úpravy UI nepřidávají server.
+
+Regresní testy: `node tests/check.mjs` a `node tests/universal.test.mjs`.
