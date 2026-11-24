@@ -203,6 +203,12 @@ def main() -> int:
     result, count = merge(existing, fetched, topology, teams)
     if count:
         OUTPUT.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    # Write only after successful login, download, merge, and validation.
+    # This also records successful checks where there were zero new captures.
+    sync_status = {'last_success_utc': datetime.now(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z'),
+                   'latest_event_id': result[-1]['id'], 'new_events': count}
+    (OUTPUT.parent / 'sync-status.json').write_text(
+        json.dumps(sync_status, ensure_ascii=False, indent=2) + '\\n', encoding='utf-8')
     print(f'Synchronizace OK: v galerii {len(fetched)}, nové {count}, celkem {len(result)}, poslední ID #{result[-1]["id"]}.')
     return 0
 
