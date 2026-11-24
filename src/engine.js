@@ -75,9 +75,19 @@ export function reconstruct(topology,rules,checkpoint,events,now=Date.now()){
    if(e.ms>now)continue;
    const station=graph.stations.get(e.stationId); const previous=base.get(e.stationId);if(!previous)continue;
    const existing=latestByStation.get(e.stationId);
-   const oldValue=existing?valueAt(existing,rules,e.ms):previous.value;
+   // Train events never decay. The required group is based strictly on the last
+   // capture's size, and each event closes at 03:00 on the following game day.
+   const oldValue=station.category==='train'?(existing?.value??previous.value):(existing?valueAt(existing,rules,e.ms):previous.value);
    const oldOwner=previous.owner;
-   const multiplier=station.is_terminus?rules.terminus_multiplier:1;
+   if(station.category==='train'){
+     const first=ordered.find(x=>x.stationId===e.stationId&&x.ms<=e.ms);
+     const closing=first?trainLockAt(first.ms,rules):null;
+     if((closing!==null&&e.ms>=closing)||(oldOwner&&e.value<=oldValue)){
+       warnings.push('Neplatná vlaková událost '+e.id+': po uzávěrce nebo bez navýšení počtu hráčů');
+       continue;
+     }
+   }
+   const multiplier=station.category==='tram'&&station.is_terminus?rules.terminus_multiplier:1;
    const scoresBefore=Object.fromEntries(Object.entries(scoring).map(([name,score])=>[name,{...score}]));
    if(!scoring[e.team]){warnings.push(`Neznámý tým v události ${e.id}: ${e.team}`);continue;}
    const add=(team,part,delta)=>{scoring[team][part]+=delta;scoring[team].total+=delta;};
@@ -85,9 +95,10 @@ export function reconstruct(topology,rules,checkpoint,events,now=Date.now()){
      if(oldOwner===e.team)add(e.team,'tram',(e.value-oldValue)*multiplier);
      else {if(oldOwner && scoring[oldOwner])add(oldOwner,'tram',-oldValue*multiplier);add(e.team,'tram',e.value*multiplier+(oldOwner?0:rules.first_capture_bonus));}
    }else if(station.category==='train') {
-     // Vlakové eventy nečerpají jízdenky; oficiální skóre potvrzuje, že první vlakové obsazení nemá +2 bonus.
-     if(oldOwner===e.team)add(e.team,'train',(e.value-oldValue)*multiplier);
-     else {if(oldOwner && scoring[oldOwner])add(oldOwner,'train',-oldValue*multiplier);add(e.team,'train',e.value*multiplier);}
+     // Highest group takes the station; no decay, terminus multiplier, +2 bonus or tickets.
+     // A takeover transfers the direct train score until the station locks at 03:00.
+     if(oldOwner===e.team)add(e.team,'train',e.value-oldValue);
+     else {if(oldOwner && scoring[oldOwner])add(oldOwner,'train',-oldValue);add(e.team,'train',e.value);}
    }
    // Update raw ownership state and refresh area bonuses after each capture.
    previous.owner=e.team; previous.value=e.value; owners.set(e.stationId,e.team);
@@ -95,18 +106,17 @@ export function reconstruct(topology,rules,checkpoint,events,now=Date.now()){
    for(const team of Object.keys(scoring)) {const delta=(newer[team]||0)-(areas[team]||0);scoring[team].area+=delta;scoring[team].total+=delta;}
    areas=newer;latestByStation.set(e.stationId,e);added++;
    const changes={};for(const name of Object.keys(scoring)){const before=scoresBefore[name],after=scoring[name];const direct=(after.tram-before.tram)+(after.train-before.train)+(after.metro-before.metro);const area=after.area-before.area;if(direct||area)changes[name]={direct,area,total:direct+area};}
-   impactByEvent.set(e.id,{changes,previousOwner:oldOwner,oldValue,retainedOnTakeover:oldOwner&&oldOwner!==e.team?Math.max(0,((existing?.value??previous.value)-oldValue)*multiplier):0});
+   impactByEvent.set(e.id,{changes,previousOwner:oldOwner,oldValue,retainedOnTakeover:station.category==='train'?0:oldOwner&&oldOwner!==e.team?Math.max(0,((existing?.value??previous.value)-oldValue)*multiplier):0});
  }
  const states=new Map();for(const s of topology.stations){const cp=base.get(s.id),capture=latestByStation.get(s.id);const owner=cp?.owner||null;
-   // Train events can be contested only during their own game day (03:00–02:59:59).
-   // After 03:00 the final train value and ownership are locked; tram decay continues normally.
-   const lockAt=s.category==='train'&&capture?trainLockAt(capture.ms,rules):null;
+   const firstTrainCapture=s.category==='train'?ordered.find(e=>e.stationId===s.id&&e.ms<=now):null;
+   const lockAt=firstTrainCapture?trainLockAt(firstTrainCapture.ms,rules):null;
    const locked=lockAt!==null&&now>=lockAt;
-   const effectiveNow=locked?lockAt-1:now;
-   const value=capture?valueAt(capture,rules,effectiveNow):cp?.value||0;
-   const transitions=s.category==='train'?timeline(capture,rules).filter(x=>x.at<lockAt):timeline(capture,rules);
+   // Train captures retain the size of the last group forever; tram stops alone decay.
+   const value=capture?(s.category==='train'?capture.value:valueAt(capture,rules,now)):cp?.value||0;
+   const transitions=s.category==='train'?[]:timeline(capture,rules);
    const pending=transitions.filter(x=>x.at>now);
-   states.set(s.id,{...s,owner,value,capture:capture||null,transitions,pending,locked,lockAt,needed:locked?null:requiredPlayers(value,owner,rules),protectedUntil:locked?null:capture?capture.ms+rules.protection_minutes*60000:null});
+   states.set(s.id,{...s,owner,value,capture:capture||null,transitions,pending,locked,lockAt,needed:locked?null:requiredPlayers(value,owner,rules),protectedUntil:s.category==='train'?null:capture?capture.ms+rules.protection_minutes*60000:null});
  }
  const history=new Map();for(const e of ordered){if(!history.has(e.stationId))history.set(e.stationId,[]);history.get(e.stationId).push(e);}
  return {graph,states,scoring,history,orderedEvents:ordered,impactByEvent,asOf:now,errors,warnings,eventsCount:ordered.length,added,checkpointId:checkpoint.checkpoint_event_id,latestEvent:ordered.length?ordered.at(-1).ms:null};
@@ -217,7 +227,7 @@ export function eventFeed(state, filters={}) {
 }
 
 // Všechna herní období mají v roce 2026 časové pásmo Europe/Prague.
-/** End of the single eligible train-event game day (all 2026 game dates are CET). */
+/** A train event locks at 03:00 following its first capture (all 2026 game dates are CET). */
 export function trainLockAt(ms,rules={}) {
  const resetHour=Number(rules.reset_hour_prague??3);
  const day=gameDayKey(ms,resetHour);
