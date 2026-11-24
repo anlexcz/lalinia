@@ -2,7 +2,7 @@ import {MY_TEAM,fmtTime,fmtShort,reconstruct,impactOf,lossOf,opportunityFor,requ
 const paths=['topology.json','rules.json','checkpoint.json','captures.json'];
 const liveCaptures='https://raw.githubusercontent.com/anlexcz/lalinia/main/data/captures.json';
 const app=document.querySelector('#app');
-let data={},state,view='overview',players=4,selected=null,search='',sortBy='value',now=Date.now(),operationsCache=[],showAreaPoints=true,eventTeam='all',eventKind='all',eventsLimit=30,includeAreaScore=true;
+let data={},state,view='overview',players=4,selected=null,search='',sortBy='value',now=Date.now(),operationsCache=[],showAreaPoints=true,eventTeam='all',eventKind='all',eventsLimit=30,includeAreaScore=true,scoreMode='total';
 let strategicMap=null;
 let selectedTeam=(()=>{try{return localStorage.getItem('lalinia-team')||'Cosa Nostra'}catch{return 'Cosa Nostra'}})(),expandedScore=null,operationTab='attack',opponent='all',mapTram=true,mapTrain=true,mapEdges=true,eventSearch='';
 let mapViewState={center:[14.42,50.087],zoom:11.4,userMoved:false};
@@ -44,15 +44,24 @@ function personFilter(){return `<div class="filter"><label for="players">Dostupn
 function targets(){return [...state.states.values()].filter(t=>t.category==='tram'&&t.owner!==selectedTeam).map(t=>impactOf(state,t.id,data.rules,selectedTeam)).filter(Boolean).filter(t=>opponent==='all'||t.owner===opponent).sort((a,b)=>b.score-a.score)}
 function overview(){
  const tickets=dailyTickets(state,data.rules,now);
- const ranking=Object.entries(state.scoring).sort((a,b)=>displayedScore(b[1],includeAreaScore)-displayedScore(a[1],includeAreaScore));
- const modes=`<div class="score-modes"><button data-score-mode="total" class="${includeAreaScore?'active':''}">Celkem</button><button data-score-mode="base" class="${!includeAreaScore?'active':''}">Bez území</button></div>`;
+ // DK = tramvajové body, které již nejsou odečitatelné přes aktuální hodnoty vlastněných zastávek.
+ const dkPoints=name=>{
+  const score=state.scoring[name];
+  const atRisk=[...state.states.values()].filter(t=>t.category==='tram'&&t.owner===name).reduce((sum,t)=>sum+t.value*(t.is_terminus?data.rules.terminus_multiplier:1),0);
+  return score.tram-atRisk;
+ };
+ const ranking=Object.entries(state.scoring).sort((a,b)=>{
+  const points=([name,score])=>scoreMode==='dk'?dkPoints(name):displayedScore(score,scoreMode==='total');
+  return points([b[0],b[1]])-points([a[0],a[1]])||a[0].localeCompare(b[0],'cs');
+ });
+ const modes=`<div class="score-modes"><button data-score-mode="total" class="${scoreMode==='total'?'active':''}">Celkem</button><button data-score-mode="base" class="${scoreMode==='base'?'active':''}">Bez území</button><button data-score-mode="dk" class="${scoreMode==='dk'?'active':''}">DK</button></div>`;
  const rows=ranking.map(([name,score],i)=>{
   const ticket=tickets.teams[name],expanded=expandedScore===name;
   const atRisk=[...state.states.values()].filter(t=>t.category==='tram'&&t.owner===name).reduce((sum,t)=>sum+t.value*(t.is_terminus?data.rules.terminus_multiplier:1),0);
-  const retained=score.tram-atRisk;
-  const values=[['Tramvaje',atRisk],['Uchované',retained],['Vlaky',score.train],['Metro',score.metro],['Území',score.area]],sum=values.reduce((n,[,v])=>n+Math.max(0,v),0);
-  const details=expanded?`<div class="score-detail"><div class="score-breakdown">${values.map(([label,value])=>`<div><span>${label}</span><b>${cap(value)}</b></div>`).join('')}</div><div class="score-bar">${values.filter(([,v])=>v>0).map(([label,v])=>`<span title="${esc(label)}: ${cap(v)}" style="width:${sum?100*v/sum:0}%;background:${({'Tramvaje':'#5ac58d','Uchované':'#b4d98f','Vlaky':'#75a7e8','Metro':'#dfb268','Území':'#a97bd8'})[label]}"></span>`).join('')}</div><div class="score-legend">Tramvaje v riziku · Uchované (decay a bonusy) · Vlaky · Metro · Území</div></div>`:'';
-  return `<div class="score-entry"><button class="score-row score-button" data-expand-team="${esc(name)}" aria-expanded="${expanded}"><span class="teamline"><i class="dot" style="background:${teamColor(name)}"></i>${i+1}. ${esc(name)}</span><strong>${cap(displayedScore(score,includeAreaScore))}</strong><span class="ticket-remaining">${cap(ticket.remaining)} / ${ticket.limit}</span><span class="chevron">${expanded?'⌃':'⌄'}</span></button>${details}</div>`;
+  const retained=dkPoints(name);
+  const values=[['Tramvaje',atRisk],['DK',retained],['Vlaky',score.train],['Metro',score.metro],['Území',score.area]],sum=values.reduce((n,[,v])=>n+Math.max(0,v),0);
+  const details=expanded?`<div class="score-detail"><div class="score-breakdown">${values.map(([label,value])=>`<div><span>${label}</span><b>${cap(value)}</b></div>`).join('')}</div><div class="score-bar">${values.filter(([,v])=>v>0).map(([label,v])=>`<span title="${esc(label)}: ${cap(v)}" style="width:${sum?100*v/sum:0}%;background:${({'Tramvaje':'#5ac58d','DK':'#b4d98f','Vlaky':'#75a7e8','Metro':'#dfb268','Území':'#a97bd8'})[label]}"></span>`).join('')}</div><div class="score-legend">Tramvaje v riziku · DK · Vlaky · Metro · Území</div></div>`:'';
+  return `<div class="score-entry"><button class="score-row score-button" data-expand-team="${esc(name)}" aria-expanded="${expanded}"><span class="teamline"><i class="dot" style="background:${teamColor(name)}"></i>${i+1}. ${esc(name)}</span><strong>${cap(scoreMode==='dk'?retained:displayedScore(score,scoreMode==='total'))}</strong><span class="ticket-remaining">${cap(ticket.remaining)} / ${ticket.limit}</span><span class="chevron">${expanded?'⌃':'⌄'}</span></button>${details}</div>`;
  }).join('');
  const recent=eventFeed(state).filter(x=>x.ms>=now-3600000);
  return `<section class="panel score-panel"><div class="score-panel-head"><h2>Pořadí týmů</h2>${modes}</div><div class="score-head"><span>Tým</span><span>Body</span><span>Jízdenky</span><span></span></div>${rows}</section><section class="panel recent-panel"><div class="section-head"><h2>Posledních 60 minut</h2><button data-view="events" class="text-link">Všechny události ›</button></div>${recent.length?recent.map(eventCard).join(''):'<div class="empty">Za posledních 60 minut není zaznamenána žádná událost.</div>'}</section>`;
@@ -151,7 +160,7 @@ function stationDetail(id){
 }
 
 function render(){if(strategicMap){const m=strategicMap;strategicMap=null;m.remove();}const body=view==='overview'?overview():view==='map'?mapView():view==='strategy'?strategyView():view==='events'?eventsView():overview();app.innerHTML=`<div class="app">${top()}${nav()}${selected!==null?stationDetail(selected):body}</div>`; if(view==='map'&&selected===null) initStrategicMap();}
-app.addEventListener('click',e=>{const exp=e.target.closest('[data-expand-team]');if(exp){expandedScore=expandedScore===exp.dataset.expandTeam?null:exp.dataset.expandTeam;render();return;}const tab=e.target.closest('[data-operation-tab]');if(tab){operationTab=tab.dataset.operationTab;render();return;}const st=e.target.closest('[data-station]');if(st){selected=Number(st.dataset.station);render();return;}const v=e.target.closest('[data-view]');if(v){selected=null;view=v.dataset.view;render();return;}if(e.target.closest('#close-detail')){selected=null;render();return;}if(e.target.closest('#more-events')){eventsLimit+=30;render();return;}const mode=e.target.closest('[data-score-mode]');if(mode){includeAreaScore=mode.dataset.scoreMode==='total';render();return;}});
+app.addEventListener('click',e=>{const exp=e.target.closest('[data-expand-team]');if(exp){expandedScore=expandedScore===exp.dataset.expandTeam?null:exp.dataset.expandTeam;render();return;}const tab=e.target.closest('[data-operation-tab]');if(tab){operationTab=tab.dataset.operationTab;render();return;}const st=e.target.closest('[data-station]');if(st){selected=Number(st.dataset.station);render();return;}const v=e.target.closest('[data-view]');if(v){selected=null;view=v.dataset.view;render();return;}if(e.target.closest('#close-detail')){selected=null;render();return;}if(e.target.closest('#more-events')){eventsLimit+=30;render();return;}const mode=e.target.closest('[data-score-mode]');if(mode){scoreMode=mode.dataset.scoreMode;includeAreaScore=scoreMode==='total';render();return;}});
 app.addEventListener('change',e=>{if(e.target.id==='players'){players=Number(e.target.value);operationsCache=[];render();}if(e.target.id==='sort'){sortBy=e.target.value;render();}if(e.target.id==='area-points'){showAreaPoints=e.target.checked;render();}if(e.target.id==='event-team'){eventTeam=e.target.value;eventsLimit=30;render();}if(e.target.id==='event-kind'){eventKind=e.target.value;eventsLimit=30;render();}if(e.target.id==='selected-team'){selectedTeam=e.target.value;try{localStorage.setItem('lalinia-team',selectedTeam)}catch{}render();}if(e.target.id==='opponent'){opponent=e.target.value;render();}if(e.target.id==='map-tram'){mapTram=e.target.checked;render();}if(e.target.id==='map-train'){mapTrain=e.target.checked;render();}if(e.target.id==='map-edges'){mapEdges=e.target.checked;render();}});
 app.addEventListener('input',e=>{if(e.target.id==='event-search'){eventSearch=e.target.value;eventsLimit=30;const pos=e.target.selectionStart;render();const el=document.getElementById('event-search');el?.focus();el?.setSelectionRange(pos,pos);return;}if(e.target.id==='search'){search=e.target.value; const pos=e.target.selectionStart;render();const el=document.getElementById('search');el?.focus();el?.setSelectionRange(pos,pos);}});
 load();
