@@ -95,7 +95,7 @@ export function reconstruct(topology,rules,checkpoint,events,now=Date.now()){
    for(const team of Object.keys(scoring)) {const delta=(newer[team]||0)-(areas[team]||0);scoring[team].area+=delta;scoring[team].total+=delta;}
    areas=newer;latestByStation.set(e.stationId,e);added++;
    const changes={};for(const name of Object.keys(scoring)){const before=scoresBefore[name],after=scoring[name];const direct=(after.tram-before.tram)+(after.train-before.train)+(after.metro-before.metro);const area=after.area-before.area;if(direct||area)changes[name]={direct,area,total:direct+area};}
-   impactByEvent.set(e.id,{changes,previousOwner:oldOwner,oldValue});
+   impactByEvent.set(e.id,{changes,previousOwner:oldOwner,oldValue,retainedOnTakeover:oldOwner&&oldOwner!==e.team?Math.max(0,((existing?.value??previous.value)-oldValue)*multiplier):0});
  }
  const states=new Map();for(const s of topology.stations){const cp=base.get(s.id),capture=latestByStation.get(s.id);const owner=cp?.owner||null;const value=capture?valueAt(capture,rules,now):cp?.value||0;
    const transitions=timeline(capture,rules);const pending=transitions.filter(x=>x.at>now);
