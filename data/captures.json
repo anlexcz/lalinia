@@ -3958,5 +3958,14 @@
     "team": "Cosa Nostra",
     "value": 6,
     "author": "Dex"
+  },
+  {
+    "id": 446,
+    "datetime": "24. 11. 2026, 18:17:36",
+    "station": "Škola Radlice",
+    "category": "tram",
+    "team": "Cosa Nostra",
+    "value": 6,
+    "author": "Dex"
   }
 ]
