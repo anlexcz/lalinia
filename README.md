@@ -45,7 +45,7 @@ Uvedený objekt je **jen ukázka formátu, ne skutečné obsazení**. Dodržte �
 ## Výpočty a omezení
 
 - Nové události se aplikují na výchozí checkpoint; změny přímého skóre a území se přepočítají po každé nové akci.
-- **Výchozí čas snapshotu není doložen.** Původní výsledky jsou ukotveny v dodaném checkpointu a předpokládá se, že přiložená historie do ID 331 odpovídá témuž stavu.
+- **Výchozí čas snapshotu není doložen.** Aktuální součty jsou nadále ukotveny v oficiálním checkpointu. Kompletní historie 328 skutečně doložených událostí do ID 331 je ovšem rekonstruovatelná od počátečního prázdného stavu: součet všech historických přímých, vlakových a územních změn **přesně odpovídá všech pěti týmům v checkpointu**. Tyto jednotlivé bodové změny lze proto zobrazit i u starších událostí.
 - Hodnoty z obsazení se snižují po sekvenčně sčítaných intervalech v `decay_hours`. Přesná implementace serveru není nezávisle ověřena.
 - U vlakových a metro eventů nemusí rekonstrukce bodování vystihovat speciální pravidla. Historie eventů je zachována, ale přírůstkové skóre těchto kategorií vyžaduje kontrolu.
 - Sekce Útok hodnotí **každé převzetí samostatně**. Sekce Operace propočítává celé dvojice a trojice po společné změně vlastníků a novém rozdělení všech komponent; nepřičítá jednotlivé bodové zisky. Hledání je heuristické a geograficky omezené, nikoli úplný důkaz optima.
@@ -81,7 +81,7 @@ Kontrolní testy: `node tests/check.mjs`.
 
 ## Synchronizace galerie každých 10 minut
 
-Workflow: [Synchronizace galerie La Linia](.github/workflows/sync-captures.yml). Spouští se pomocí `cron: '*/10 * * * *'` nebo ručně v GitHub Actions; interval je požadovaný, ale start běhů **GitHub negarantuje na minutu přesně**.
+Workflow: [Synchronizace galerie La Linia](.github/workflows/sync-captures.yml). Spouští se pomocí `cron: '7-59/10 * * * *'` (minuty **07, 17, 27, 37, 47, 57**) nebo ručně v GitHub Actions; interval je požadovaný, ale start běhů **GitHub negarantuje na minutu přesně**.
 
 ### Jednorázové nastavení na mobilu
 
@@ -105,7 +105,7 @@ Test lokálně: `python -m unittest discover -s tests -p 'test_sync.py'` a `node
 ## Univerzální rozhraní – listopad 2026
 
 - **Přehled** je pro všechny týmy stejný. V jediném kompaktním žebříčku je tým, body a zbývající denní jízdenky. Přepínač `Celkem / Bez území` přerovnává pořadí. Po rozkliknutí řádku se zobrazí rozpad na tramvajové body v riziku, body Decay, vlak, metro a aktuální území, s procentuálním pruhem. Uchované tramvajové body jsou **tramvajové skóre mínus současná odečitatelná hodnota vlastněných zastávek**; zahrnují tak i první bonusy a historické zisky, nejde o čisté „body za decay“.
-- Pod žebříčkem je seznam **skutečných událostí za klouzavých 60 minut**, včetně změny přímých i celkových bodů obou týmů. Při převzetí s prokazatelným decay se zobrazuje, kolik přímých bodů původnímu týmu zůstalo. Bodové změny jsou **doložitelné až po výchozím checkpointu ID 331**; u dřívějších událostí není přesný historický rozpad tvrzen.
+- Pod žebříčkem je seznam **skutečných událostí za klouzavých 60 minut**, včetně změny přímých i celkových bodů obou týmů. Při převzetí s prokazatelným decay se zobrazuje, kolik přímých bodů původnímu týmu zůstalo. Bodové změny se nyní **rekonstruují i pro všech 328 událostí do checkpointu ID 331**; jejich součet se ověřuje oproti bodům všech pěti týmů v checkpointu. Novější události se nadále přehrávají z checkpointu.
 - **Události**: posledních 30 položek, tlačítko přidává dalších 30, filtry dle týmu (včetně jeho ztrát), typu a hledaného názvu zastávky.
 - **Mapa**: nezávislé přepínače tramvají, vlaků a spojnic; tramvajové značky jsou kolečka, vlakové čtverce; obojí obsahuje aktuální herní hodnotu.
 - **Operace**: přepnutí Útok/Obrana, počet hráčů, volitelný cílový či útočící tým. Samostatné útoky rozlišují přímý bodový zisk/ztrátu od celkového dopadu včetně územních komponent.
