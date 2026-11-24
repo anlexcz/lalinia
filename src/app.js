@@ -1,6 +1,8 @@
 import {MY_TEAM,fmtTime,fmtShort,reconstruct,impactOf,lossOf,opportunityFor,requiredPlayers,stationHistory,findOperations,recentCaptures,eventFeed,dailyTickets,displayedScore} from './engine.js?v=20261124-universal1';
 const paths=['topology.json','rules.json','checkpoint.json','captures.json'];
 const liveCaptures='https://raw.githubusercontent.com/anlexcz/lalinia/main/data/captures.json';
+const liveSyncStatus='https://raw.githubusercontent.com/anlexcz/lalinia/main/data/sync-status.json';
+let lastSuccessfulSync=null;
 const app=document.querySelector('#app');
 let data={},state,view='overview',players=4,selected=null,search='',sortBy='value',now=Date.now(),operationsCache=[],showAreaPoints=true,eventTeam='all',eventKind='all',eventsLimit=30,includeAreaScore=true,scoreMode='total';
 let strategicMap=null;
@@ -27,17 +29,34 @@ async function fetchCaptures(){
   return events;
  }
 }
+async function fetchSyncStatus(){
+ try{
+  const r=await fetch(liveSyncStatus+'?v='+Math.floor(Date.now()/60000),{cache:'no-store'});
+  if(!r.ok)return;
+  const status=await r.json();
+  const ms=Date.parse(status.last_success_utc||'');
+  if(Number.isFinite(ms)&&ms>0&&ms<=Date.now()+60000)lastSuccessfulSync=ms;
+ }catch(err){console.warn('Čas poslední úspěšné synchronizace není dostupný:',err);}
+}
+function syncTimestamp(){
+ if(!lastSuccessfulSync)return 'Čeká na první ověřenou synchronizaci';
+ const date=new Date(lastSuccessfulSync);
+ const formatDay=ms=>new Date(ms).toLocaleDateString('sv-SE',{timeZone:'Europe/Prague'});
+ const time=date.toLocaleTimeString('cs-CZ',{timeZone:'Europe/Prague',hour:'2-digit',minute:'2-digit'});
+ return formatDay(lastSuccessfulSync)===formatDay(Date.now())?'Dnes '+time:date.toLocaleDateString('cs-CZ',{timeZone:'Europe/Prague',day:'numeric',month:'numeric'})+' '+time;
+}
 async function load(){
  try{
   const content=await Promise.all(paths.map(p=>p==='captures.json'?fetchCaptures():fetch('./data/'+p+'?v='+Date.now(),{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error(p+' HTTP '+r.status);return r.json();})));
-  [data.topology,data.rules,data.checkpoint,data.captures]=content;refresh();
+  [data.topology,data.rules,data.checkpoint,data.captures]=content;
+  await fetchSyncStatus();refresh();
  }catch(e){app.innerHTML=`<div class="loading bad">Nelze načíst data: ${esc(e.message)}</div>`;}
 }
 function refresh(){now=Date.now();state=reconstruct(data.topology,data.rules,data.checkpoint,data.captures,now);operationsCache=[];render();}
 function nav(){return `<nav class="nav">${[['overview','Přehled'],['map','Mapa'],['strategy','Operace'],['events','Události']].map(([id,name])=>`<button data-view="${id}" class="${view===id?'active':''}">${name}</button>`).join('')}</nav>`;}
 function top(){
  const warning=state.errors.length?`<div class="warning">${state.errors.length} chyb ve vstupních událostech: ${esc(state.errors[0])}</div>`:'';
- return `<header class="top"><div><div class="eyebrow">LA LINIA</div><h1>Herní přehled</h1></div><div class="top-controls"><label for="selected-team">Pohled týmu</label><select id="selected-team">${Object.keys(state.scoring).map(t=>`<option ${t===selectedTeam?'selected':''} value="${esc(t)}">${esc(t)}</option>`).join('')}</select><span class="stamp">Poslední událost ${state.latestEvent?fmtTime(state.latestEvent):'bez událostí'}</span></div></header>${warning}`;
+ return `<header class="top"><div><div class="eyebrow">LA LINIA</div><h1>Herní přehled</h1></div><div class="top-controls"><label for="selected-team">Pohled týmu</label><select id="selected-team">${Object.keys(state.scoring).map(t=>`<option ${t===selectedTeam?'selected':''} value="${esc(t)}">${esc(t)}</option>`).join('')}</select><span class="stamp" id="sync-stamp">Poslední aktualizace: ${syncTimestamp()}</span></div></header>${warning}`;
 }
 function card(name,num){return `<div class="card"><span class="sub">${name}</span><strong>${num}</strong></div>`;}
 function personFilter(){return `<div class="filter"><label for="players">Dostupní hráči</label><select id="players">${[3,4,5,6,7,8,9,10,12].map(n=>`<option value="${n}" ${players===n?'selected':''}>${n} hráčů</option>`).join('')}</select></div>`;}
@@ -198,6 +217,7 @@ app.addEventListener('change',e=>{if(e.target.id==='players'){players=Number(e.t
 app.addEventListener('input',e=>{if(e.target.id==='event-search'){eventSearch=e.target.value;eventsLimit=30;const pos=e.target.selectionStart;render();const el=document.getElementById('event-search');el?.focus();el?.setSelectionRange(pos,pos);return;}if(e.target.id==='search'){search=e.target.value; const pos=e.target.selectionStart;render();const el=document.getElementById('search');el?.focus();el?.setSelectionRange(pos,pos);}});
 load();
 setInterval(()=>{if(data.topology)refresh();},60000);
+setInterval(async()=>{if(!data.topology)return;await fetchSyncStatus();const el=document.getElementById('sync-stamp');if(el)el.textContent='Poslední aktualizace: '+syncTimestamp();},60000);
 setInterval(async()=>{
  if(!data.topology)return;
  try{
