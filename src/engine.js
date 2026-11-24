@@ -71,6 +71,54 @@ export function reconstruct(topology,rules,checkpoint,events,now=Date.now()){
  // Replay only captures occurring after the checkpoint; older history is the source of decay epochs.
  let added=0;
  const impactByEvent=new Map();
+ // Replay the original capture history from an empty map to recover per-event
+ // score changes before the official checkpoint. Keep the official checkpoint
+ // as the source of truth for current totals and post-checkpoint replay.
+ const historicalOwners=new Map(),historicalLast=new Map();
+ const historicalScoring=Object.fromEntries(checkpoint.teams.map(t=>[t.name,{tram:0,train:0,metro:0,area:0}]));
+ let historicalAreas={};
+ for(const e of ordered){
+   if(e.id>checkpoint.checkpoint_event_id||e.ms>now)continue;
+   const station=graph.stations.get(e.stationId);
+   const oldOwner=historicalOwners.get(e.stationId)||null;
+   const existing=historicalLast.get(e.stationId);
+   const oldValue=existing?(station.category==='train'?existing.value:valueAt(existing,rules,e.ms)):0;
+   const multiplier=station.category==='tram'&&station.is_terminus?rules.terminus_multiplier:1;
+   const scoresBefore=Object.fromEntries(Object.entries(historicalScoring).map(([name,score])=>[name,{...score}]));
+   const add=(team,part,delta)=>{if(historicalScoring[team])historicalScoring[team][part]+=delta;};
+   if(station.category==='tram'){
+     if(oldOwner===e.team)add(e.team,'tram',(e.value-oldValue)*multiplier);
+     else{
+       if(oldOwner)add(oldOwner,'tram',-oldValue*multiplier);
+       add(e.team,'tram',e.value*multiplier+(oldOwner?0:rules.first_capture_bonus));
+     }
+   }else if(station.category==='train'){
+     if(oldOwner===e.team)add(e.team,'train',e.value-oldValue);
+     else{
+       if(oldOwner)add(oldOwner,'train',-oldValue);
+       add(e.team,'train',e.value);
+     }
+   }
+   historicalOwners.set(e.stationId,e.team);
+   historicalLast.set(e.stationId,e);
+   const newer=areaOf(historicalOwners,graph,rules).scores;
+   for(const team of Object.keys(historicalScoring))
+     historicalScoring[team].area+=(newer[team]||0)-(historicalAreas[team]||0);
+   historicalAreas=newer;
+   const changes={};
+   for(const name of Object.keys(historicalScoring)){
+     const before=scoresBefore[name],after=historicalScoring[name];
+     const direct=(after.tram-before.tram)+(after.train-before.train)+(after.metro-before.metro);
+     const area=after.area-before.area;
+     if(direct||area)changes[name]={direct,area,total:direct+area};
+   }
+   impactByEvent.set(e.id,{
+     changes,previousOwner:oldOwner,oldValue,
+     retainedOnTakeover:station.category==='tram'&&oldOwner&&oldOwner!==e.team
+       ?Math.max(0,(existing.value-oldValue)*multiplier):0,
+     source:'historical-replay'
+   });
+ }
  for(const e of ordered){if(e.id<=checkpoint.checkpoint_event_id)continue;
    if(e.ms>now)continue;
    const station=graph.stations.get(e.stationId); const previous=base.get(e.stationId);if(!previous)continue;
