@@ -37,14 +37,14 @@ jobs:
         run: python scripts/sync_captures.py
       - name: Validate application data
         run: node tests/check.mjs
-      - name: Commit only when there are new events
+      - name: Publish successful synchronization timestamp and new events
         run: |
-          if git diff --quiet -- data/captures.json; then
-            echo 'No new events; no commit needed.'
+          git add data/captures.json data/sync-status.json
+          if git diff --cached --quiet; then
+            echo 'No changes to commit.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/captures.json
-          git commit -m 'Auto-sync La Linia capture events'
+          git commit -m 'Auto-sync La Linia data and successful check time'
           git push origin HEAD:main
