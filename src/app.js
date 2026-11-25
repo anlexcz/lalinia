@@ -1,8 +1,9 @@
-import {MY_TEAM,fmtTime,fmtShort,reconstruct,impactOf,lossOf,opportunityFor,requiredPlayers,stationHistory,findOperations,recentCaptures,eventFeed,dailyTickets,displayedScore} from './engine.js?v=20261124-full-history';
+import {MY_TEAM,fmtTime,fmtShort,reconstruct,impactOf,lossOf,opportunityFor,requiredPlayers,stationHistory,findOperations,recentCaptures,eventFeed,dailyTickets,displayedScore} from './engine.js?v=20261125-live-api';
 const paths=['topology.json','rules.json','checkpoint.json','captures.json'];
 const liveCaptures='https://raw.githubusercontent.com/anlexcz/lalinia/main/data/captures.json';
 const liveSyncStatus='https://raw.githubusercontent.com/anlexcz/lalinia/main/data/sync-status.json';
-let lastSuccessfulSync=null;
+let lastSuccessfulSync=null, livePublishedAt=null, liveLoading=false;
+const liveSnapshotUrl='https://raw.githubusercontent.com/anlexcz/lalinia/main/data/live.json';
 const app=document.querySelector('#app');
 const routes={overview:'prehled',map:'mapa',strategy:'operace',events:'udalosti'};
 const viewFromHash=()=>Object.keys(routes).find(key=>'#/'+routes[key]===window.location.hash)||'overview';
@@ -60,8 +61,28 @@ function syncTimestamp(){
  const time=date.toLocaleTimeString('cs-CZ',{timeZone:'Europe/Prague',hour:'2-digit',minute:'2-digit'});
  return formatDay(lastSuccessfulSync)===formatDay(Date.now())?'Dnes '+time:date.toLocaleDateString('cs-CZ',{timeZone:'Europe/Prague',day:'numeric',month:'numeric'})+' '+time;
 }
+async function fetchLiveSnapshot(){
+ const urls=[liveSnapshotUrl+'?v='+Math.floor(Date.now()/30000),'./data/live.json?v='+Math.floor(Date.now()/30000)];
+ for(const url of urls){
+  try{
+   const r=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(10000)});
+   if(!r.ok)throw Error('HTTP '+r.status);
+   const s=await r.json(),stamp=Date.parse(s.publishedAt);
+   if(s.source!=='official-api-v1'||!Number.isFinite(stamp)||!Array.isArray(s.captures)||!s.captures.length||!Array.isArray(s.topology?.stations)||!Array.isArray(s.topology?.edges)||!s.rules||!s.checkpoint)throw Error('Invalid live snapshot');
+   if(livePublishedAt!==null&&stamp<=livePublishedAt)return false;
+   if(data.captures?.length&&s.captures.length<data.captures.length)throw Error('Shorter history requires review');
+   const candidate=reconstruct(s.topology,s.rules,s.checkpoint,s.captures,Date.now());
+   if(candidate.errors.length||candidate.warnings.length)throw Error([...candidate.errors,...candidate.warnings].join('; '));
+   data={topology:s.topology,rules:s.rules,checkpoint:s.checkpoint,captures:s.captures,metroEvents:s.metroEvents||[]};
+   livePublishedAt=stamp;lastSuccessfulSync=stamp;
+   refresh();return true;
+  }catch(e){console.warn('Live snapshot unavailable:',e);}
+ }
+ return false;
+}
 async function load(){
  try{
+  if(await fetchLiveSnapshot())return;
   const content=await Promise.all(paths.map(p=>p==='captures.json'?fetchCaptures():fetch('./data/'+p+'?v='+Date.now(),{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error(p+' HTTP '+r.status);return r.json();})));
   [data.topology,data.rules,data.checkpoint,data.captures]=content;
   await fetchSyncStatus();refresh();
@@ -71,7 +92,7 @@ function refresh(){now=Date.now();state=reconstruct(data.topology,data.rules,dat
 function nav(){return `<nav class="nav">${[['overview','Přehled'],['map','Mapa'],['strategy','Operace'],['events','Události']].map(([id,name])=>`<a href="#/${routes[id]}" data-view="${id}" class="${view===id?'active':''}" ${view===id?'aria-current="page"':''}>${name}</a>`).join('')}</nav>`;}
 function top(){
  const warning=state.errors.length?`<div class="warning">${state.errors.length} chyb ve vstupních událostech: ${esc(state.errors[0])}</div>`:'';
- return `<header class="top"><div><div class="eyebrow">LA LINIA</div><h1>Herní přehled</h1></div><div class="top-controls"><label for="selected-team">Pohled týmu</label><select id="selected-team">${Object.keys(state.scoring).map(t=>`<option ${t===selectedTeam?'selected':''} value="${esc(t)}">${esc(t)}</option>`).join('')}</select><span class="stamp" id="sync-stamp">Poslední aktualizace: ${syncTimestamp()}</span></div></header>${warning}`;
+ return `<header class="top"><div><div class="eyebrow">LA LINIA</div><h1>Herní přehled</h1></div><div class="top-controls"><label for="selected-team">Pohled týmu</label><select id="selected-team">${Object.keys(state.scoring).map(t=>`<option ${t===selectedTeam?'selected':''} value="${esc(t)}">${esc(t)}</option>`).join('')}</select><span class="stamp" id="sync-stamp">${livePublishedAt!==null?'Publikováno':'Záložní data'}: ${syncTimestamp()}</span></div></header>${warning}`;
 }
 function card(name,num){return `<div class="card"><span class="sub">${name}</span><strong>${num}</strong></div>`;}
 function personFilter(){return `<div class="filter"><label for="players">Dostupní hráči</label><select id="players">${[3,4,5,6,7,8,9,10,12].map(n=>`<option value="${n}" ${players===n?'selected':''}>${n} hráčů</option>`).join('')}</select></div>`;}
@@ -264,15 +285,8 @@ app.addEventListener('input',e=>{if(e.target.id==='event-search'){eventSearch=e.
 window.addEventListener('hashchange',()=>{const next=viewFromHash();if(next!==view||selected!==null){view=next;selected=null;if(state){render();window.scrollTo(0,0);}}});
 load();
 setInterval(()=>{if(data.topology)refresh();},60000);
-setInterval(async()=>{if(!data.topology)return;await fetchSyncStatus();const el=document.getElementById('sync-stamp');if(el)el.textContent='Poslední aktualizace: '+syncTimestamp();},120000);
 setInterval(async()=>{
- if(!data.topology)return;
- try{
-  const captures=await fetchCaptures();
-  const previousId=Math.max(...data.captures.map(e=>e.id));
-  const incomingId=Math.max(...captures.map(e=>e.id));
-  if(incomingId>previousId && captures.length>=data.captures.length){
-   data.captures=captures;refresh();
-  }
- }catch(e){console.warn('Aktualizaci historie nelze načíst:',e);}
-},120000);
+ if(liveLoading)return;
+ liveLoading=true;
+ try{await fetchLiveSnapshot();}finally{liveLoading=false;}
+},30000);
