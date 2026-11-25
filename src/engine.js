@@ -300,3 +300,30 @@ export function dailyTickets(state,rules,when=state.asOf){
  return {day,limit,teams:tickets};
 }
 export function displayedScore(score,includeArea=true){return score.total-(includeArea?0:score.area);}
+
+/** Metro awards are absolute official results, not captures or repeatable deltas. */
+export function metroAwards(events,teams,now=Date.now()){
+ const ids=new Set(teams.map(t=>t.id)), seen=new Map();
+ for(const e of events||[]){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(e.date)||!Number.isInteger(e.station_id)||!Array.isArray(e.points))throw Error('Invalid metro event');
+  const at=Date.parse(e.date+'T03:00:00+01:00');
+  if(at>now)continue;
+  for(const p of e.points){
+   const points=p.points;
+   if(!ids.has(p.team_id)||!Number.isFinite(points)||points<0)throw Error('Unknown metro award format');
+   const key=e.date+'|'+e.station_id+'|'+p.team_id;
+   if(seen.has(key)&&seen.get(key).points!==points)throw Error('Conflicting metro award');
+   seen.set(key,{key,at,date:e.date,stationId:e.station_id,teamId:p.team_id,points});
+  }
+ }
+ return [...seen.values()];
+}
+export function applyMetroAwards(state,events,teams,now=state.asOf){
+ const awards=metroAwards(events,teams,now);
+ for(const t of teams){
+  const score=state.scoring[t.name];if(!score)continue;
+  const points=awards.filter(a=>a.teamId===t.id).reduce((n,a)=>n+a.points,0);
+  score.total+=points-score.metro;score.metro=points;
+ }
+ return state;
+}
