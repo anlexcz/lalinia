@@ -257,3 +257,5 @@
 .decay-row .strategy-scores{white-space:nowrap}.decay-row .strategy-scores>.decay-time{color:var(--decay-color,var(--text));font-variant-numeric:tabular-nums}
 .operation-filters.decay-filters{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
 .decay-filters .filter{display:block;min-width:0;margin:0}.decay-filters select,.decay-filters input{width:100%;min-width:0;box-sizing:border-box;height:40px;padding:8px;font-size:12px}
+
+.site-credit{text-align:center;color:var(--muted);font-size:11px;padding:18px 0 10px}.site-credit a{color:inherit;text-decoration:underline;text-underline-offset:3px}.site-credit a:hover,.site-credit a:focus-visible{color:var(--text)}
