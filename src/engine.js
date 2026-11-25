@@ -51,7 +51,7 @@ export function reconstruct(topology,rules,checkpoint,events,now=Date.now()){
   try {
    const ms=parseCaptureTime(e.datetime), value=Number(e.value);
    if(!Number.isInteger(value)||value<rules.minimum_players){errors.push(`Událost ${e.id}: neplatný počet hráčů`);continue;}
-   const matches=lookups.get(`${e.category}|${e.station}`)||[];
+   const matches=e.station_id!=null?(graph.stations.has(e.station_id)?[graph.stations.get(e.station_id)]:[]):(lookups.get(`${e.category}|${e.station}`)||[]);
    if(matches.length!==1){errors.push(`Událost ${e.id}: zastávka „${e.station}“ (${e.category}) má ${matches.length} shod`);continue;}
    ordered.push({...e,stationId:matches[0].id,ms,value});
   }catch(err){errors.push(`Událost ${e.id}: ${err.message}`);}
