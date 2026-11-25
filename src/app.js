@@ -1,4 +1,4 @@
-import {MY_TEAM,fmtTime,fmtShort,reconstruct,impactOf,lossOf,opportunityFor,requiredPlayers,stationHistory,findOperations,recentCaptures,eventFeed,dailyTickets,displayedScore} from './engine.js?v=20261125-live-api';
+import {applyMetroAwards,MY_TEAM,fmtTime,fmtShort,reconstruct,impactOf,lossOf,opportunityFor,requiredPlayers,stationHistory,findOperations,recentCaptures,eventFeed,dailyTickets,displayedScore} from './engine.js?v=20261125-metro';
 const paths=['topology.json','rules.json','checkpoint.json','captures.json'];
 const liveCaptures='https://raw.githubusercontent.com/anlexcz/lalinia/main/data/captures.json';
 const liveSyncStatus='https://raw.githubusercontent.com/anlexcz/lalinia/main/data/sync-status.json';
@@ -71,7 +71,7 @@ async function fetchLiveSnapshot(){
    if(s.source!=='official-api-v1'||!Number.isFinite(stamp)||!Array.isArray(s.captures)||!s.captures.length||!Array.isArray(s.topology?.stations)||!Array.isArray(s.topology?.edges)||!s.rules||!s.checkpoint)throw Error('Invalid live snapshot');
    if(livePublishedAt!==null&&stamp<=livePublishedAt)return false;
    if(data.captures?.length&&s.captures.length<data.captures.length)throw Error('Shorter history requires review');
-   const candidate=reconstruct(s.topology,s.rules,s.checkpoint,s.captures,Date.now());
+   const candidate=applyMetroAwards(reconstruct(s.topology,s.rules,s.checkpoint,s.captures,Date.now()),s.metroEvents,s.teams||s.checkpoint.teams);
    if(candidate.errors.length||candidate.warnings.length)throw Error([...candidate.errors,...candidate.warnings].join('; '));
    data={topology:s.topology,rules:s.rules,checkpoint:s.checkpoint,captures:s.captures,metroEvents:s.metroEvents||[]};
    livePublishedAt=stamp;lastSuccessfulSync=stamp;
@@ -88,7 +88,7 @@ async function load(){
   await fetchSyncStatus();refresh();
  }catch(e){app.innerHTML=`<div class="loading bad">Nelze načíst data: ${esc(e.message)}</div>`;}
 }
-function refresh(){now=Date.now();state=reconstruct(data.topology,data.rules,data.checkpoint,data.captures,now);operationsCache=[];render(true);}
+function refresh(){now=Date.now();state=reconstruct(data.topology,data.rules,data.checkpoint,data.captures,now);if(data.metroEvents)applyMetroAwards(state,data.metroEvents,data.checkpoint.teams);operationsCache=[];render(true);}
 function nav(){return `<nav class="nav">${[['overview','Přehled'],['map','Mapa'],['strategy','Operace'],['events','Události']].map(([id,name])=>`<a href="#/${routes[id]}" data-view="${id}" class="${view===id?'active':''}" ${view===id?'aria-current="page"':''}>${name}</a>`).join('')}</nav>`;}
 function top(){
  const warning=state.errors.length?`<div class="warning">${state.errors.length} chyb ve vstupních událostech: ${esc(state.errors[0])}</div>`:'';
