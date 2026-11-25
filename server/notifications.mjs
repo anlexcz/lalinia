@@ -1,4 +1,4 @@
-import {timeline,gameDayKey,trainLockAt,reconstruct} from '../src/engine.js';
+import {metroAwards,applyMetroAwards,timeline,gameDayKey,trainLockAt,reconstruct} from '../src/engine.js';
 const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
 const colors={2:'🟠',3:'🟢',4:'🟣',5:'🔵',6:'🔴'};
 const fmt=new Intl.DateTimeFormat('cs-CZ',{timeZone:'Europe/Prague',day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'});
@@ -37,19 +37,24 @@ export function notificationEvents(s,teamId=3){
   previous.set(c.station_id,c);
  }
  for(const c of previous.values())decay(c,until,true);
+ for(const a of metroAwards(s.metroEvents,s.teams,until).filter(x=>x.teamId===teamId)){
+  const st=stations.get(a.stationId);
+  add('metro|'+a.key,a.at,'<b>🚇 METRO EVENT</b>\n🚏 <b>'+esc(st?.name??a.stationId)+'</b>\n\n'+label(teamId)+'\n🏆 <b>'+signed(a.points)+' bodů</b>','metro',a.points);
+ }
  return out.sort((a,b)=>a.at-b.at||a.key.localeCompare(b.key));
 }
 export function dailyReport(s,teamId,end,events){
  const start=end-86400000,team=s.teams.find(t=>t.id===teamId),day=gameDayKey(start);
  const e=events.filter(x=>x.at>=start&&x.at<end),count=k=>e.filter(x=>x.kind===k).length;
- const state=reconstruct(s.topology,s.rules,s.checkpoint,s.captures,end-1);
+ const state=applyMetroAwards(reconstruct(s.topology,s.rules,s.checkpoint,s.captures,end-1),s.metroEvents,s.teams,end-1);
  if(state.errors.length||state.warnings.length)throw Error('Report state invalid');
  const spent=s.captures.filter(c=>c.team_id===teamId&&c.category==='tram'&&gameDayKey(Date.parse(c.datetime_created))===day).reduce((n,c)=>n+c.value,0);
  const owned=[...state.states.values()].filter(x=>x.owner===team.name),train=owned.filter(x=>x.category==='train'&&x.lockAt===end).reduce((n,x)=>n+x.value,0);
  const decay=e.filter(x=>x.kind==='decay').reduce((n,x)=>n+x.points,0),bonus=e.filter(x=>x.kind==='first').reduce((n,x)=>n+x.points,0);
+ const metro=e.filter(x=>x.kind==='metro').reduce((n,x)=>n+x.points,0);
  const rivals=s.teams.filter(t=>t.id!==teamId).map(t=>(colors[t.id]||'⚪')+' '+esc(t.name)+': '+e.filter(x=>x.kind==='takeover'&&x.opponent===t.id).length+' / '+e.filter(x=>x.kind==='loss'&&x.opponent===t.id).length).join('\n');
  const ranking=Object.entries(state.scoring).sort((a,b)=>b[1].total-a[1].total).map(([name,v],i)=>{const t=s.teams.find(t=>t.name===name);return (i+1)+'. '+(colors[t?.id]||'⚪')+' '+esc(name)+' – <b>'+v.total+'</b>';}).join('\n');
  const next=owned.filter(x=>x.category==='tram').flatMap(x=>x.pending.map(p=>({...p,name:x.name,mult:x.is_terminus?s.rules.terminus_multiplier:1}))).sort((a,b)=>a.at-b.at);
  const forecast=next.filter(x=>x.at<end+86400000&&x.at<=Date.parse(s.rules.game_end_datetime)).reduce((n,x)=>n+x.mult,0);
- return '<b>📊 '+esc(team.name.toUpperCase())+' | DENNÍ REPORT</b>\n<i>'+day+' · 03:00–02:59</i>\n\n<b>🚏 Zastávky</b>\nPrvní obsazení: '+count('first')+'\nPřevzato: '+count('takeover')+'\nZtraceno: '+count('loss')+'\nPosíleno: '+count('reinforce')+'\nBilance: <b>'+signed(count('first')+count('takeover')-count('loss'))+'</b>\nCelkem vlastníme: '+owned.length+'\n\n<b>🏆 Jisté body</b>\nDecay: '+signed(decay)+'\nPrvní bonusy: '+signed(bonus)+'\nUzavřené vlakové eventy: '+signed(train)+'\nDenní zisk bez metra: <b>'+signed(decay+bonus+train)+'</b>\n\n<b>🎫 Jízdenky</b>\nVyužito: '+spent+'/'+s.rules.tickets_per_day+'\nNevyužito: '+Math.max(0,s.rules.tickets_per_day-spent)+'\n\n<b>⚔️ Soupeři (získáno / ztraceno)</b>\n'+rivals+'\n\n<b>🏅 Pořadí týmů</b>\n'+ranking+'\n\n<b>🔮 Výhled</b>\nPotenciální decay: '+signed(forecast)+(next.length?'\nNejbližší: 🚏 '+esc(next[0].name)+' – '+time(next[0].at):'')+'\n\n🎫 Nový herní den: '+s.rules.tickets_per_day+'/'+s.rules.tickets_per_day;
+ return '<b>📊 '+esc(team.name.toUpperCase())+' | DENNÍ REPORT</b>\n<i>'+day+' · 03:00–02:59</i>\n\n<b>🚏 Zastávky</b>\nPrvní obsazení: '+count('first')+'\nPřevzato: '+count('takeover')+'\nZtraceno: '+count('loss')+'\nPosíleno: '+count('reinforce')+'\nBilance: <b>'+signed(count('first')+count('takeover')-count('loss'))+'</b>\nCelkem vlastníme: '+owned.length+'\n\n<b>🏆 Jisté body</b>\nDecay: '+signed(decay)+'\nPrvní bonusy: '+signed(bonus)+'\nUzavřené vlakové eventy: '+signed(train)+'\nMetro eventy: '+signed(metro)+'\nDenní zisk: <b>'+signed(decay+bonus+train+metro)+'</b>\n\n<b>🎫 Jízdenky</b>\nVyužito: '+spent+'/'+s.rules.tickets_per_day+'\nNevyužito: '+Math.max(0,s.rules.tickets_per_day-spent)+'\n\n<b>⚔️ Soupeři (získáno / ztraceno)</b>\n'+rivals+'\n\n<b>🏅 Pořadí týmů</b>\n'+ranking+'\n\n<b>🔮 Výhled</b>\nPotenciální decay: '+signed(forecast)+(next.length?'\nNejbližší: 🚏 '+esc(next[0].name)+' – '+time(next[0].at):'')+'\n\n🎫 Nový herní den: '+s.rules.tickets_per_day+'/'+s.rules.tickets_per_day;
 }
