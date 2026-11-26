@@ -113,3 +113,5 @@ Test lokálně: `python -m unittest discover -s tests -p 'test_sync.py'` a `node
 - Synchronizace zůstává každých 10 minut přes GitHub Actions; web kontroluje nové události každé dvě minuty. Úpravy UI nepřidávají server.
 
 Regresní testy: `node tests/check.mjs` a `node tests/universal.test.mjs`.
+
+- **Události – Decay:** odvozené historické poklesy tramvajových zastávek se zobrazují kompaktně mezi obsazeními. Výpočet končí dalším obsazením, zahrnuje konečné ×2 a nemění skóre ani zdrojový export. Přehled posledních 60 minut zůstává omezen na skutečná obsazení. Operace začínají záložkou Decay.
