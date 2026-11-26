@@ -1,4 +1,4 @@
-import {applyMetroAwards,MY_TEAM,fmtTime,fmtShort,reconstruct,impactOf,lossOf,opportunityFor,requiredPlayers,stationHistory,findOperations,recentCaptures,eventFeed,dailyTickets,displayedScore} from './engine.js?v=20261125-metro';
+import {applyMetroAwards,MY_TEAM,fmtTime,fmtShort,reconstruct,impactOf,lossOf,opportunityFor,requiredPlayers,stationHistory,findOperations,recentCaptures,eventFeed,dailyTickets,displayedScore} from './engine.js?v=20261126-decay';
 const paths=['topology.json','rules.json','checkpoint.json','captures.json'];
 const liveCaptures='https://raw.githubusercontent.com/anlexcz/lalinia/main/data/captures.json';
 const liveSyncStatus='https://raw.githubusercontent.com/anlexcz/lalinia/main/data/sync-status.json';
@@ -9,7 +9,7 @@ const routes={overview:'prehled',map:'mapa',strategy:'operace',events:'udalosti'
 const viewFromHash=()=>Object.keys(routes).find(key=>'#/'+routes[key]===window.location.hash)||'overview';
 let data={},state,view=viewFromHash(),players=4,selected=null,search='',sortBy='value',now=Date.now(),operationsCache=[],showAreaPoints=true,eventTeam='all',eventKind='all',eventsLimit=30,includeAreaScore=true,scoreMode='total';
 let strategicMap=null;
-let selectedTeam=(()=>{try{return localStorage.getItem('lalinia-team')||'Cosa Nostra'}catch{return 'Cosa Nostra'}})(),expandedScore=null,operationTab='attack',decayTeam='all',mapDecay=true,opponent='all',mapTram=true,mapTrain=true,mapEdges=true,eventSearch='',operationSearch='';
+let selectedTeam=(()=>{try{return localStorage.getItem('lalinia-team')||'Cosa Nostra'}catch{return 'Cosa Nostra'}})(),expandedScore=null,operationTab='decay',decayTeam='all',mapDecay=true,opponent='all',mapTram=true,mapTrain=true,mapEdges=true,eventSearch='',operationSearch='';
 let mapViewState={center:[14.42,50.087],zoom:11.4,userMoved:false};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const teamColor=owner=>({'Cosa Nostra':'#32b968','Spiriti':'#5797db','Zemunski klan':'#a475d8','Yakuza':'#e56a67','Los Bandidos':'#dcb467'})[owner]||'#64746b';
@@ -123,6 +123,7 @@ function overview(){
  return `<section class="panel score-panel"><div class="score-panel-head"><h2>Pořadí týmů</h2>${modes}</div><div class="score-head"><span>Tým</span><span>Body</span><span>Jízdenky</span><span></span></div>${rows}</section><section class="panel recent-panel"><div class="section-head"><h2>Posledních 60 minut</h2><button data-view="events" class="text-link">Všechny události ›</button></div>${recent.length?recent.map(eventCard).join(''):'<div class="empty">Za posledních 60 minut není zaznamenána žádná událost.</div>'}</section>`;
 }
 function eventCard(e){
+ if(e.kind==='decay')return `<div class="event-card event-decay"><button class="event-open" data-station="${e.stationId}"><span class="event-value decay-event-icon" style="background:${teamColor(e.team)}" aria-label="Decay">⌛</span><span class="event-main"><b>${esc(e.station)}</b><small>${fmtShort(e.ms)} · ${esc(e.team)} · ${e.from} → ${e.to}</small></span><strong class="good decay-event-points">+${cap(e.retainedPoints)} decay</strong><span class="event-chevron" aria-hidden="true">›</span></button></div>`;
  const changes=e.impact?.changes||{},gain=changes[e.team],loss=e.previousOwner&&e.previousOwner!==e.team?changes[e.previousOwner]:null;
  const relation=e.kind==='takeover'?`${esc(e.team)} · převzetí od ${esc(e.previousOwner)}`:`${esc(e.team)} · ${e.kind==='reinforce'?'posílení':'první obsazení'}`;
  const signed=n=>`${n>0?'+':n<0?'−':''}${cap(Math.abs(n))}`;
@@ -161,7 +162,7 @@ function decayView(modes){
  return `<div class="toolbar"><h2>Operace</h2>${modes}</div><div class="operation-filters decay-filters"><div class="filter"><select id="decay-team" aria-label="Tým">${[['all','Všechny týmy'],...Object.keys(state.scoring).map(t=>[t,t])].map(([v,l])=>`<option value="${v}" ${decayTeam===v?'selected':''}>${l}</option>`).join('')}</select></div><div class="filter operation-search-filter"><input aria-label="Zastávka" id="operation-search" type="search" autocomplete="off" placeholder="Hledat zastávku…" value="${esc(operationSearch)}"></div></div><div class="strategy-context">${rows.length} zastávek · předpokládaný decay</div><section class="panel strategy-list">${rows.map(({s,t})=>{const level=decayLevel(t);return `<button class="strategy-row decay-row" data-decay-station="${s.id}"><span class="decay-team-stripe" aria-hidden="true" style="background:${teamColor(s.owner)}"></span><span class="strategy-subject"><b>${esc(s.name)}</b><small>${esc(s.owner)} · ${fmtShort(t.at)}</small></span><span class="strategy-scores"><b class="decay-time ${level?'decay-'+level:''}">${decayCountdown(t)}</b><small>${t.from} → ${t.to}</small></span></button>`}).join('')||'<div class="empty">Žádné odpovídající zastávky.</div>'}</section>`;
 }
 function strategyView(){
- const modes=`<div class="score-modes"><button data-operation-tab="attack" class="${operationTab==='attack'?'active':''}">Útok</button><button data-operation-tab="defense" class="${operationTab==='defense'?'active':''}">Obrana</button><button data-operation-tab="decay" class="${operationTab==='decay'?'active':''}">Decay</button></div>`;
+ const modes=`<div class="score-modes"><button data-operation-tab="decay" class="${operationTab==='decay'?'active':''}">Decay</button><button data-operation-tab="attack" class="${operationTab==='attack'?'active':''}">Útok</button><button data-operation-tab="defense" class="${operationTab==='defense'?'active':''}">Obrana</button></div>`;
  if(operationTab==='decay')return decayView(modes);
  const ownFilter=`<div class="filter"><label for="selected-team">Tým</label><select id="selected-team">${Object.keys(state.scoring).map(t=>`<option value="${esc(t)}" ${t===selectedTeam?'selected':''}>${esc(t)}</option>`).join('')}</select></div>`;
  const teamFilter=operationTab==='attack'?`<div class="filter"><label for="opponent">Cílový tým</label><select id="opponent"><option value="all">Všechny týmy</option>${Object.keys(state.scoring).filter(t=>t!==selectedTeam).map(t=>`<option value="${esc(t)}" ${opponent===t?'selected':''}>${esc(t)}</option>`).join('')}</select></div>`:'';
@@ -178,7 +179,7 @@ function strategyView(){
 }
 function eventsView(){
  const teams=Object.keys(state.scoring);
- const rows=eventFeed(state,{team:eventTeam,kind:eventKind}).filter(x=>!eventSearch||x.station.toLocaleLowerCase('cs').includes(eventSearch.toLocaleLowerCase('cs')));
+ const rows=eventFeed(state,{team:eventTeam,kind:eventKind,includeDecay:true,rules:data.rules}).filter(x=>!eventSearch||x.station.toLocaleLowerCase('cs').includes(eventSearch.toLocaleLowerCase('cs')));
  const select=(id,opts,value)=>`<select id="${id}">${opts.map(([v,label])=>`<option value="${esc(v)}" ${v===value?'selected':''}>${esc(label)}</option>`).join('')}</select>`;
  const formatDay=ms=>new Date(ms).toLocaleDateString('sv-SE',{timeZone:'Europe/Prague'});
  const today=formatDay(now),yesterday=formatDay(now-86400000);
@@ -189,7 +190,7 @@ function eventsView(){
   previousDay=day;
   return heading+eventCard(e);
  }).join('');
- return `<div class="toolbar"><h2>Události</h2><span class="note">${rows.length} záznamů</span></div><div class="event-filters">${select('event-team',[['all','Všechny týmy'],...teams.map(t=>[t,t])],eventTeam)}${select('event-kind',[['all','Všechny typy'],['first','První obsazení'],['takeover','Převzetí'],['reinforce','Posílení']],eventKind)}<input id="event-search" placeholder="Hledat zastávku…" value="${esc(eventSearch)}"></div><section class="panel event-list">${list||'<div class="empty">Žádné odpovídající události.</div>'}</section>${rows.length>eventsLimit?`<button class="load-more" id="more-events">Načíst dalších 30 · zbývá ${rows.length-eventsLimit}</button>`:''}`;
+ return `<div class="toolbar"><h2>Události</h2><span class="note">${rows.length} záznamů</span></div><div class="event-filters">${select('event-team',[['all','Všechny týmy'],...teams.map(t=>[t,t])],eventTeam)}${select('event-kind',[['all','Všechny typy'],['first','První obsazení'],['takeover','Převzetí'],['reinforce','Posílení'],['decay','Decay']],eventKind)}<input id="event-search" placeholder="Hledat zastávku…" value="${esc(eventSearch)}"></div><section class="panel event-list">${list||'<div class="empty">Žádné odpovídající události.</div>'}</section>${rows.length>eventsLimit?`<button class="load-more" id="more-events">Načíst dalších 30 · zbývá ${rows.length-eventsLimit}</button>`:''}`;
 }
 function mapView(){
  const n=[...state.states.values()].filter(t=>t.category==='tram').length;
