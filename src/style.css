@@ -259,3 +259,10 @@
 .decay-filters .filter{display:block;min-width:0;margin:0}.decay-filters select,.decay-filters input{width:100%;min-width:0;box-sizing:border-box;height:40px;padding:8px;font-size:12px}
 
 .site-credit{text-align:center;color:var(--muted);font-size:11px;padding:18px 0 10px}.site-credit a{color:inherit;text-decoration:underline;text-underline-offset:3px}.site-credit a:hover,.site-credit a:focus-visible{color:var(--text)}
+
+/* Compact derived decay rows. */
+.event-list .event-decay .event-open{align-items:center;padding:6px 0;gap:8px}
+.event-list .event-decay .decay-event-icon{flex:0 0 24px;width:24px;height:24px;min-width:24px;font-size:12px;margin:0}
+.event-decay .event-main{gap:1px}
+.event-decay .event-main small{overflow-wrap:anywhere}
+.decay-event-points{font-size:11px;white-space:nowrap;flex:none}
