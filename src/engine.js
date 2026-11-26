@@ -254,6 +254,23 @@ export function findOperations(state,rules,players=4,maxTickets=30){
 export function recentCaptures(state,count=15){return (state.orderedEvents||[]).filter(e=>e.ms<=state.asOf).slice(-count).reverse();}
 
 /** Chronological event log with ownership transitions, for the Events page. */
+export function buildDecayEvents(state,rules) {
+ const rows=[];
+ for(const [stationId,history] of state.history){
+  const station=state.graph.stations.get(stationId);
+  if(station?.category!=='tram')continue;
+  const captures=history.filter(e=>e.ms<=state.asOf);
+  for(let i=0;i<captures.length;i++){
+   const e=captures[i], end=Math.min(state.asOf,captures[i+1]?.ms??Infinity);
+   for(const d of timeline(e,rules)){
+    if(d.at>end)break;
+    rows.push({id:'decay:'+e.id+':'+d.from,kind:'decay',category:'tram',derived:true,sourceCaptureId:e.id,stationId,station:e.station,team:e.team,ms:d.at,from:d.from,to:d.to,retainedPoints:(d.from-d.to)*(station.is_terminus?2:1),previousOwner:null,impact:null});
+   }
+  }
+ }
+ return rows;
+}
+
 export function eventFeed(state, filters={}) {
  const prior=new Map(), rows=[];
  for(const e of state.orderedEvents||[]){
@@ -266,10 +283,11 @@ export function eventFeed(state, filters={}) {
   rows.push({...e,previousOwner,kind,scope,impact:impact||null});
   prior.set(e.stationId,e.team);
  }
- return rows.reverse().filter(e=>
+ if(filters.includeDecay && filters.rules)rows.push(...buildDecayEvents(state,filters.rules));
+ return rows.sort((a,b)=>b.ms-a.ms||(a.derived!==b.derived?(a.derived?1:-1):Number(b.sourceCaptureId??b.id)-Number(a.sourceCaptureId??a.id))).filter(e=>
    (!filters.team||filters.team==='all'||e.team===filters.team||e.previousOwner===filters.team) &&
    (!filters.kind||filters.kind==='all'||filters.kind==='takeover'&&e.kind==='takeover'||
-    filters.kind==='first'&&e.kind==='first'||filters.kind==='reinforce'&&e.kind==='reinforce'||
+    filters.kind==='decay'&&e.kind==='decay'||filters.kind==='first'&&e.kind==='first'||filters.kind==='reinforce'&&e.kind==='reinforce'||
     filters.kind==='gain'&&e.team===(filters.team&&filters.team!=='all'?filters.team:MY_TEAM)||filters.kind==='loss'&&e.previousOwner===(filters.team&&filters.team!=='all'?filters.team:MY_TEAM)&&e.team!==(filters.team&&filters.team!=='all'?filters.team:MY_TEAM))
  );
 }
